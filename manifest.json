@@ -10,7 +10,7 @@
     "https://github.com/*"
   ],
   "action": {
-    "default_popup": "popup/hello.html",
+    "default_popup": "hello.html",
     "default_icon": {
       "16": "images/hello_extensions.png",
       "48": "images/hello_extensions.png",
@@ -23,11 +23,11 @@
         "https://github.com/*"
       ],
       "js": [
-        "js/content.js"
+        "content.js"
       ]
     }
   ],
   "background": {
-    "service_worker": "js/background.js"
+    "service_worker": "background.js"
   }
 }
