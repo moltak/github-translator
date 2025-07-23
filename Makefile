@@ -14,12 +14,7 @@ $(NODE_MODULES): package.json
 
 # Build the project
 build: clean
-	@mkdir -p dist/js
-	@mkdir -p dist/popup
-	npm run build && \
-	cp manifest.json dist/ && \
-	cp -r src/images dist/ && \
-	cp src/popup/hello.html dist/popup/
+	npm run build
 
 # Clean the build artifacts
 clean:
