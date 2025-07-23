@@ -1,10 +1,33 @@
 {
-  "name": "Hello Extensions",
-  "description": "Base Level Extension",
+  "name": "GitHub Issues/PRs Translator",
+  "description": "Translate GitHub Issues and Pull Requests content between Korean and English.",
   "version": "1.0",
   "manifest_version": 3,
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://github.com/*"
+  ],
   "action": {
-    "default_popup": "hello.html",
-    "default_icon": "hello_extensions.png"
+    "default_popup": "popup/hello.html",
+    "default_icon": {
+      "16": "images/hello_extensions.png",
+      "48": "images/hello_extensions.png",
+      "128": "images/hello_extensions.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://github.com/*"
+      ],
+      "js": [
+        "js/content.js"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "js/background.js"
   }
 }
