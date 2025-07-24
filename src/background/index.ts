@@ -1,4 +1,5 @@
 // Background Service Worker for GitHub Translator Extension
+import { handleTranslationMessage } from './translation-handler';
 
 console.log('GitHub Translator Background Worker started');
 
@@ -15,10 +16,17 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
-// Content Script로부터 메시지 수신
-chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+// Content Script로부터 메시지 수신 (번역 기능 통합)
+chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   console.log('Background received message:', request);
   
+  // Handle translation requests
+  if (request.type === 'TRANSLATE') {
+    const handled = await handleTranslationMessage(request, sender, sendResponse);
+    return handled;
+  }
+  
+  // Handle legacy demo messages
   if (request.action === 'demo') {
     console.log('Demo message received from content script');
     sendResponse({ success: true, message: 'Hello from background!' });
