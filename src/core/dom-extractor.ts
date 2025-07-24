@@ -167,9 +167,7 @@ export function findAllPossibleTitles(): ExtractedTitle[] {
 export function replaceTitles(titles: ExtractedTitle[], replacementText = 'HELLO GITHUB TRANSLATOR'): number {
   let replacedCount = 0;
   
-  console.log(`🔄 Replacing ${titles.length} titles with "${replacementText}"`);
-  
-  titles.forEach((title, index) => {
+    titles.forEach((title, index) => {
     try {
       const { element } = title;
       
@@ -190,7 +188,6 @@ export function replaceTitles(titles: ExtractedTitle[], replacementText = 'HELLO
         element.setAttribute('data-original-title', originalText);
         element.setAttribute('data-github-translator', 'replaced');
         
-        console.log(`✅ ${index + 1}. Replaced: "${originalText}" → "${replacementText}"`);
         replacedCount++;
       }
     } catch (error) {
@@ -198,7 +195,7 @@ export function replaceTitles(titles: ExtractedTitle[], replacementText = 'HELLO
     }
   });
   
-  console.log(`🎯 Successfully replaced ${replacedCount} titles`);
+  console.log(`🎯 Replaced ${replacedCount}/${titles.length} titles with "${replacementText}"`);
   return replacedCount;
 }
 
@@ -225,22 +222,17 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
         continue;
       }
       
-      console.log(`🔄 Translating (${index + 1}/${titles.length}): "${originalText.substring(0, 50)}..."`);
-      
       // 원본 텍스트 백업 및 로딩 표시
       element.setAttribute('data-original-title', originalText);
       element.setAttribute('data-github-translator', 'translating');
       element.textContent = `🔄 Translating...`;
       
       // Background Script에 번역 요청
-      console.log(`📡 Sending translation request: ${originalText.substring(0, 30)}...`);
       const response = await chrome.runtime.sendMessage({
         type: 'TRANSLATE',
         text: originalText,
         direction: TranslationDirection.EN_TO_KO
       });
-      
-      console.log(`📨 Received response:`, response);
       
       if (response && response.success) {
         // 번역 성공
@@ -248,12 +240,11 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
         element.setAttribute('data-github-translator', 'translated');
         replacedElements.set(element, originalText);
         
-        console.log(`✅ (${index + 1}/${titles.length}) Translated: "${originalText.substring(0, 30)}..." → "${response.translatedText.substring(0, 30)}..."`);
         successCount++;
       } else {
         // 번역 실패 - 원본 복원
         const errorMsg = response?.error || 'Translation failed';
-        console.error(`❌ (${index + 1}/${titles.length}) Translation failed: ${errorMsg}`);
+        console.error(`❌ Translation failed: ${errorMsg}`);
         
         element.textContent = originalText;
         element.setAttribute('data-github-translator', 'error');
@@ -261,7 +252,7 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
       }
       
     } catch (error) {
-      console.error(`❌ (${index + 1}/${titles.length}) Translation error:`, error);
+      console.error(`❌ Translation error:`, error);
       
       // 에러 시 원본 복원
       const originalText = title.element.getAttribute('data-original-title') || title.element.textContent || '';
@@ -271,7 +262,7 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
     }
   }
   
-  console.log(`🎉 Real translation completed: ${successCount}/${titles.length} titles translated successfully`);
+  console.log(`🎉 Real translation completed: ${successCount}/${titles.length} titles translated`);
   return successCount;
 }
 
@@ -281,8 +272,6 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
 export function restoreTitles(): number {
   let restoredCount = 0;
   
-  console.log(`🔄 Restoring ${replacedElements.size} replaced titles`);
-  
   replacedElements.forEach((originalText, element) => {
     try {
       if (element.textContent && element.hasAttribute('data-github-translator')) {
@@ -290,7 +279,6 @@ export function restoreTitles(): number {
         element.removeAttribute('data-original-title');
         element.removeAttribute('data-github-translator');
         
-        console.log(`✅ Restored: "${originalText}"`);
         restoredCount++;
       }
     } catch (error) {
@@ -299,7 +287,7 @@ export function restoreTitles(): number {
   });
   
   replacedElements.clear();
-  console.log(`🎯 Successfully restored ${restoredCount} titles`);
+  console.log(`🎯 Restored ${restoredCount} titles to original text`);
   return restoredCount;
 }
 
@@ -311,17 +299,12 @@ export function getIssueTitles(): ExtractedTitle[] {
   const selectors = getTitleSelectors(pageInfo.type);
   const extractedTitles: ExtractedTitle[] = [];
   
-  console.log(`🔍 Extracting titles for page type: ${pageInfo.type}`);
-  console.log(`🎯 Using selectors:`, selectors);
-  
   // 각 선택자로 요소들을 찾아보기
   for (const selector of selectors) {
     try {
       const elements = document.querySelectorAll<HTMLElement>(selector);
       
       if (elements.length > 0) {
-        console.log(`✅ Found ${elements.length} elements with selector: "${selector}"`);
-        
         elements.forEach((element, index) => {
           const text = element.textContent?.trim() || '';
           if (text && text.length > 3) { // 의미있는 텍스트만 추출
@@ -340,8 +323,6 @@ export function getIssueTitles(): ExtractedTitle[] {
         if (extractedTitles.length > 0) {
           break;
         }
-      } else {
-        console.log(`❌ No elements found with selector: "${selector}"`);
       }
     } catch (error) {
       console.warn(`⚠️ Invalid selector: "${selector}"`, error);
@@ -374,20 +355,11 @@ export function getIssueTitles(): ExtractedTitle[] {
     }
   }
   
-  // 결과 로깅
+  // 간단한 결과 로깅
   if (extractedTitles.length > 0) {
-    console.log(`📄 Extracted ${extractedTitles.length} titles:`);
-    extractedTitles.forEach((title, index) => {
-      const status = title.isReplaced ? '🔄 (replaced)' : '📌';
-      console.log(`  ${status} ${index + 1}. "${title.text}" (${title.selector})`);
-    });
+    console.log(`📄 Found ${extractedTitles.length} titles on ${pageInfo.type} page`);
   } else {
     console.warn('⚠️ No titles found on this page');
-    
-    // 디버깅을 위한 추가 정보
-    console.log('🔍 Debug: Available elements on page:');
-    const debugElements = document.querySelectorAll('a, h1, h2, h3, [class*="title"], [class*="Title"]');
-    console.log(`Found ${debugElements.length} potential elements to analyze`);
   }
   
   return extractedTitles;
