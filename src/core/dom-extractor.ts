@@ -1,7 +1,5 @@
 // DOM Extractor for GitHub Issues/PRs
 
-import { TranslationDirection } from './translation';
-
 export interface GitHubPageInfo {
   type: 'issue' | 'pull_request' | 'issues_list' | 'pulls_list' | 'other';
   url: string;
@@ -231,7 +229,7 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
       const response = await chrome.runtime.sendMessage({
         type: 'TRANSLATE',
         text: originalText,
-        direction: TranslationDirection.EN_TO_KO
+        direction: 'EN_TO_KO'
       });
       
       if (response && response.success) {

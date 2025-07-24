@@ -52,7 +52,9 @@ function validateTranslationRequest(request: any): request is TranslationRequest
     return false;
   }
 
-  if (!Object.values(TranslationDirection).includes(request.direction)) {
+  // Accept both enum values and string values for compatibility
+  const validDirections = ['EN_TO_KO', 'KO_TO_EN', TranslationDirection.EN_TO_KO, TranslationDirection.KO_TO_EN];
+  if (!validDirections.includes(request.direction)) {
     return false;
   }
 

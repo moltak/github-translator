@@ -1,7 +1,6 @@
 // Content Script for GitHub Translator Extension
 
 import { getIssueTitles, detectPageType, waitForDOM, extractAndReplaceTitles, extractAndTranslateTitles, restoreTitles } from '../core/dom-extractor';
-import { TranslationDirection } from '../core/translation';
 
 console.log('🚀 Hello GitHub Translator - Content Script Loaded!');
 
