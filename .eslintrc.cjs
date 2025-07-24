@@ -7,8 +7,7 @@ module.exports = {
   },
   extends: [
     'airbnb-base',
-    'airbnb-typescript/base',
-    '@typescript-eslint/recommended'
+    'airbnb-typescript/base'
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
@@ -25,8 +24,8 @@ module.exports = {
       devDependencies: ['**/*.test.ts', '**/*.spec.ts', 'vite.config.ts'] 
     }],
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-    'no-console': 'warn',
+    'no-console': 'off', // Chrome Extension에서는 console 사용 필요
     'max-len': ['error', { code: 100, ignoreComments: true }]
   },
-  ignorePatterns: ['dist/', 'node_modules/', '*.js']
+  ignorePatterns: ['dist/', 'node_modules/', '*.js', '*.cjs']
 }

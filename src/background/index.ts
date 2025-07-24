@@ -16,7 +16,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 // Content Script로부터 메시지 수신
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   console.log('Background received message:', request);
   
   if (request.action === 'demo') {
