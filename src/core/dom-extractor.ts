@@ -201,6 +201,76 @@ export function replaceTitles(titles: ExtractedTitle[], replacementText = 'HELLO
 }
 
 /**
+ * 제목을 실제 번역으로 교체합니다.
+ * Sprint 3.5: Real Translation Integration
+ */
+export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Promise<number> {
+  console.log(`🌐 Starting real translation for ${titles.length} titles...`);
+  
+  let successCount = 0;
+  
+  for (const [index, title] of titles.entries()) {
+    try {
+      const { element } = title;
+      
+      // 이미 교체된 요소는 건너뛰기
+      if (replacedElements.has(element)) {
+        continue;
+      }
+      
+      const originalText = element.textContent?.trim() || '';
+      if (!originalText) {
+        continue;
+      }
+      
+      console.log(`🔄 Translating (${index + 1}/${titles.length}): "${originalText.substring(0, 50)}..."`);
+      
+      // 원본 텍스트 백업 및 로딩 표시
+      element.setAttribute('data-original-title', originalText);
+      element.setAttribute('data-github-translator', 'translating');
+      element.textContent = `🔄 Translating...`;
+      
+      // Background Script에 번역 요청
+      const response = await chrome.runtime.sendMessage({
+        type: 'TRANSLATE',
+        text: originalText,
+        direction: 'EN_TO_KO'
+      });
+      
+      if (response && response.success) {
+        // 번역 성공
+        element.textContent = response.translatedText;
+        element.setAttribute('data-github-translator', 'translated');
+        replacedElements.set(element, originalText);
+        
+        console.log(`✅ (${index + 1}/${titles.length}) Translated: "${originalText.substring(0, 30)}..." → "${response.translatedText.substring(0, 30)}..."`);
+        successCount++;
+      } else {
+        // 번역 실패 - 원본 복원
+        const errorMsg = response?.error || 'Translation failed';
+        console.error(`❌ (${index + 1}/${titles.length}) Translation failed: ${errorMsg}`);
+        
+        element.textContent = originalText;
+        element.setAttribute('data-github-translator', 'error');
+        element.setAttribute('data-translation-error', errorMsg);
+      }
+      
+    } catch (error) {
+      console.error(`❌ (${index + 1}/${titles.length}) Translation error:`, error);
+      
+      // 에러 시 원본 복원
+      const originalText = title.element.getAttribute('data-original-title') || title.element.textContent || '';
+      title.element.textContent = originalText;
+      title.element.setAttribute('data-github-translator', 'error');
+      title.element.setAttribute('data-translation-error', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+  
+  console.log(`🎉 Real translation completed: ${successCount}/${titles.length} titles translated successfully`);
+  return successCount;
+}
+
+/**
  * 교체된 제목들을 원본으로 복원합니다.
  */
 export function restoreTitles(): number {
@@ -332,6 +402,26 @@ export function extractAndReplaceTitles(replacementText = 'HELLO GITHUB TRANSLAT
     console.log('📭 No titles to replace');
   }
   
+  return titles;
+}
+
+/**
+ * 제목을 추출하고 실제 번역으로 교체합니다.
+ * Sprint 3.5: Real Translation Integration
+ */
+export async function extractAndTranslateTitles(): Promise<ExtractedTitle[]> {
+  console.log('🎯 Sprint 3.5 - Real Translation Starting...');
+  
+  const titles = getIssueTitles();
+  
+  if (titles.length === 0) {
+    console.log('📭 No titles found to translate');
+    return titles;
+  }
+  
+  const translatedCount = await replaceTitlesWithTranslation(titles);
+  
+  console.log(`🎉 Sprint 3.5 Complete: Extracted and translated ${translatedCount}/${titles.length} titles!`);
   return titles;
 }
 

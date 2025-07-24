@@ -79,7 +79,7 @@ describe('TranslationService', () => {
       const inputText = 'Hello world';
       let capturedRequestBody: any;
 
-      mockFetch.mockImplementationOnce(async (url, options) => {
+      mockFetch.mockImplementationOnce(async (_url, options) => {
         capturedRequestBody = JSON.parse(options.body);
         return {
           ok: true,
@@ -113,7 +113,7 @@ describe('TranslationService', () => {
       const inputText = '안녕 세상';
       let capturedRequestBody: any;
 
-      mockFetch.mockImplementationOnce(async (url, options) => {
+      mockFetch.mockImplementationOnce(async (_url, options) => {
         capturedRequestBody = JSON.parse(options.body);
         return {
           ok: true,
@@ -147,7 +147,7 @@ describe('TranslationService', () => {
       const inputText = 'Test text';
       let capturedHeaders: any;
 
-      mockFetch.mockImplementationOnce(async (url, options) => {
+      mockFetch.mockImplementationOnce(async (_url, options) => {
         capturedHeaders = options.headers;
         return {
           ok: true,
@@ -239,7 +239,7 @@ describe('TranslationService', () => {
       const inputText = '**Bold text** and `code snippet` with [link](url)';
       let capturedRequestBody: any;
 
-      mockFetch.mockImplementationOnce(async (url, options) => {
+      mockFetch.mockImplementationOnce(async (_url, options) => {
         capturedRequestBody = JSON.parse(options.body);
         return {
           ok: true,

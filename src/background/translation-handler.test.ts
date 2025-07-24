@@ -28,7 +28,17 @@ describe('Translation Message Handler', () => {
     });
 
     mockSender = {
-      tab: { id: 123, url: 'https://github.com/test/repo' },
+      tab: { 
+        id: 123, 
+        url: 'https://github.com/test/repo',
+        index: 0,
+        pinned: false,
+        highlighted: false,
+        windowId: 1,
+        active: true,
+        incognito: false,
+        selected: false
+      } as chrome.tabs.Tab,
       url: 'https://github.com/test/repo'
     };
 

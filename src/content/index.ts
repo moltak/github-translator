@@ -1,6 +1,6 @@
 // Content Script for GitHub Translator Extension
 
-import { getIssueTitles, detectPageType, waitForDOM, extractAndReplaceTitles, restoreTitles } from '../core/dom-extractor';
+import { getIssueTitles, detectPageType, waitForDOM, extractAndReplaceTitles, extractAndTranslateTitles, restoreTitles } from '../core/dom-extractor';
 
 console.log('🚀 Hello GitHub Translator - Content Script Loaded!');
 
@@ -34,13 +34,21 @@ if (window.location.hostname === 'github.com') {
         return;
       }
       
-      // Sprint 2.3: 제목 추출 및 교체 실행
-      console.log('🎯 Sprint 2.3 - Title Extraction & Replacement Starting...');
-      currentTitles = extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
+      // Check if API key is available for real translation
+      const storage = await chrome.storage.sync.get(['openaiApiKey']);
+      const hasApiKey = !!storage.openaiApiKey;
+      
+      if (hasApiKey) {
+        console.log('🎯 Sprint 3.5 - Real Translation Starting...');
+        currentTitles = await extractAndTranslateTitles();
+      } else {
+        console.log('🎯 Sprint 2.3 - Demo Mode (No API Key) - Using Placeholder...');
+        currentTitles = extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
+      }
       
       if (currentTitles.length > 0) {
-        console.log('🎉 Sprint 2.1 & 2.3 - Title Extraction & Replacement Successful!');
-        console.log(`📋 Found and replaced ${currentTitles.length} GitHub issue/PR titles`);
+        console.log('🎉 Title Processing Successful!');
+        console.log(`📋 Found and processed ${currentTitles.length} GitHub issue/PR titles`);
         
         // 원본 제목들을 콘솔에 출력 (Sprint 2.4)
         console.log('📜 Original titles before replacement:');
@@ -216,8 +224,19 @@ if (window.location.hostname === 'github.com') {
           restoreOriginalTitles();
           console.log('🔄 Restored titles via keyboard shortcut');
         } else {
-          extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
-          console.log('🔄 Replaced titles via keyboard shortcut');
+          // Check if API key is available for real translation
+          chrome.storage.sync.get(['openaiApiKey']).then(storage => {
+            const hasApiKey = !!storage.openaiApiKey;
+            
+            if (hasApiKey) {
+              extractAndTranslateTitles().then(() => {
+                console.log('🔄 Translated titles via keyboard shortcut');
+              });
+            } else {
+              extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
+              console.log('🔄 Replaced titles via keyboard shortcut (Demo Mode)');
+            }
+          });
         }
       }
     }
