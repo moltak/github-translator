@@ -1,6 +1,7 @@
 // Content Script for GitHub Translator Extension
 
 import { getIssueTitles, detectPageType, waitForDOM, extractAndReplaceTitles, extractAndTranslateTitles, restoreTitles } from '../core/dom-extractor';
+import { TranslationDirection } from '../core/translation';
 
 console.log('🚀 Hello GitHub Translator - Content Script Loaded!');
 
@@ -38,9 +39,21 @@ if (window.location.hostname === 'github.com') {
       const storage = await chrome.storage.sync.get(['openaiApiKey']);
       const hasApiKey = !!storage.openaiApiKey;
       
+      console.log('🔍 API Key Debug:', { 
+        storage, 
+        hasApiKey, 
+        apiKeyExists: !!storage.openaiApiKey,
+        apiKeyLength: storage.openaiApiKey ? storage.openaiApiKey.length : 0 
+      });
+      
       if (hasApiKey) {
         console.log('🎯 Sprint 3.5 - Real Translation Starting...');
-        currentTitles = await extractAndTranslateTitles();
+        try {
+          currentTitles = await extractAndTranslateTitles();
+        } catch (error) {
+          console.error('❌ Real translation failed, falling back to demo mode:', error);
+          currentTitles = extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
+        }
       } else {
         console.log('🎯 Sprint 2.3 - Demo Mode (No API Key) - Using Placeholder...');
         currentTitles = extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
@@ -225,13 +238,17 @@ if (window.location.hostname === 'github.com') {
           console.log('🔄 Restored titles via keyboard shortcut');
         } else {
           // Check if API key is available for real translation
-          chrome.storage.sync.get(['openaiApiKey']).then(storage => {
+          chrome.storage.sync.get(['openaiApiKey']).then(async (storage) => {
             const hasApiKey = !!storage.openaiApiKey;
             
             if (hasApiKey) {
-              extractAndTranslateTitles().then(() => {
+              try {
+                await extractAndTranslateTitles();
                 console.log('🔄 Translated titles via keyboard shortcut');
-              });
+              } catch (error) {
+                console.error('❌ Translation failed via shortcut, using demo mode:', error);
+                extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
+              }
             } else {
               extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
               console.log('🔄 Replaced titles via keyboard shortcut (Demo Mode)');

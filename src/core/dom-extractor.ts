@@ -1,5 +1,7 @@
 // DOM Extractor for GitHub Issues/PRs
 
+import { TranslationDirection } from './translation';
+
 export interface GitHubPageInfo {
   type: 'issue' | 'pull_request' | 'issues_list' | 'pulls_list' | 'other';
   url: string;
@@ -231,11 +233,14 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
       element.textContent = `🔄 Translating...`;
       
       // Background Script에 번역 요청
+      console.log(`📡 Sending translation request: ${originalText.substring(0, 30)}...`);
       const response = await chrome.runtime.sendMessage({
         type: 'TRANSLATE',
         text: originalText,
-        direction: 'EN_TO_KO'
+        direction: TranslationDirection.EN_TO_KO
       });
+      
+      console.log(`📨 Received response:`, response);
       
       if (response && response.success) {
         // 번역 성공
@@ -414,11 +419,14 @@ export async function extractAndTranslateTitles(): Promise<ExtractedTitle[]> {
   
   const titles = getIssueTitles();
   
+  console.log(`🔍 Extracted ${titles.length} titles for translation:`, titles.map(t => t.text.substring(0, 30) + '...'));
+  
   if (titles.length === 0) {
     console.log('📭 No titles found to translate');
     return titles;
   }
   
+  console.log('🌐 Calling replaceTitlesWithTranslation...');
   const translatedCount = await replaceTitlesWithTranslation(titles);
   
   console.log(`🎉 Sprint 3.5 Complete: Extracted and translated ${translatedCount}/${titles.length} titles!`);
