@@ -8,7 +8,8 @@
   },
   "scripts": {
     "dev": "vite build --mode development --watch",
-    "build": "vite build",
+    "build": "vite build && npm run copy-assets",
+    "copy-assets": "cp src/popup/popup.html dist/popup.html && cp -r src/icons dist/ && cp manifest.json dist/",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
