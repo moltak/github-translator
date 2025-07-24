@@ -289,8 +289,8 @@ export function getIssueTitles(): ExtractedTitle[] {
       // Issues/PRs 패턴 필터링
       const filteredTitles = allTitles.filter(title => 
         title.text.length > 10 && // 충분히 긴 텍스트
-        (title.element.href?.includes('/issues/') || 
-         title.element.href?.includes('/pull/') ||
+        ((title.element as HTMLAnchorElement).href?.includes('/issues/') || 
+         (title.element as HTMLAnchorElement).href?.includes('/pull/') ||
          title.selector.includes('Issue') ||
          title.selector.includes('Pull'))
       );
