@@ -149,8 +149,8 @@
 #### **Phase 1: Core Translation Engine (Tasks 3.1-3.2)**
 | 태스크 | 상태 | 설명 | 우선순위 |
 |--------|------|------|----------|
-| 3.1 TranslationService 구현 | 🔄 진행예정 | OpenAI Responses API 클라이언트 구현 | 🔥 High |
-| 3.2 Background Message Hub | 🔄 진행예정 | Content ↔ Background ↔ OpenAI 메시지 플로우 | 🔥 High |
+| 3.1 TranslationService 구현 | ✅ 완료 | OpenAI Responses API 클라이언트 구현 | 🔥 High |
+| 3.2 Background Message Hub | ✅ 완료 | Content ↔ Background ↔ OpenAI 메시지 플로우 | 🔥 High |
 
 #### **Phase 2: Production Readiness (Tasks 3.3-3.4)**
 | 태스크 | 상태 | 설명 | 우선순위 |
@@ -322,6 +322,38 @@ describe('TranslationService', () => {
 5. **Day 3-4**: API Key Management UI (3.4)
 6. **Day 5**: DOM Integration (3.5) + 최종 테스트
 
+### ✅ **Sprint 3 Phase 1 완료! (Tasks 3.1-3.2)**
+
+**🎯 Task 3.1 - TranslationService 구현 완료**:
+- OpenAI Responses API 클라이언트 (`gpt-4.1-mini-2025-04-14`)
+- 정확한 엔드포인트: `/v1/responses` (NOT Chat Completions)
+- 방향별 프롬프트: EN→KO, KO→EN with markdown 보존
+- 강력한 에러 핸들링: API 키, 네트워크, 응답 형식 검증
+- 14개 단위 테스트 완벽 통과 (TDD 방식)
+
+**🎯 Task 3.2 - Background Message Hub 구현 완료**:
+- Content ↔ Background 번역 메시지 처리
+- Chrome Storage API 키 관리 및 초기화
+- Singleton 패턴으로 TranslationService 재사용
+- 포괄적 요청 검증 (타입, 필드, 텍스트 유효성)
+- 11개 통합 테스트 완벽 통과
+
+**📊 현재 테스트 상태**:
+- ✅ **39개 테스트 모두 통과** (Sprint 1-3 누적)
+- ✅ TranslationService: 14개 테스트
+- ✅ Background Handler: 11개 테스트  
+- ✅ DOM Extractor: 14개 테스트
+- ✅ 기존 테스트 유지
+
+**🔧 완성된 기능**:
+- Core Translation Engine ✓
+- Background Message Processing ✓
+- API Key Secure Storage ✓
+- Error Handling & Logging ✓
+- Request Validation ✓
+
+**🚀 다음 단계**: Phase 2 (Rate Limiting & API Key UI) 또는 Phase 3 (DOM Integration)
+
 ---
 **마지막 업데이트**: 2024-12-19  
-**현재 스프린트**: Sprint 3 - OpenAI Integration & Translation Service (Task 3.1 시작 준비)
+**현재 스프린트**: Sprint 3 Phase 1 완료 - Phase 2 준비중
