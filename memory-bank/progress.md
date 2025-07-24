@@ -138,3 +138,190 @@
 ---
 **마지막 업데이트**: 2024-12-19  
 **다음 스프린트**: Sprint 3 - OpenAI Integration & Translation Service
+
+## 🚀 Sprint 3 - OpenAI Integration & Translation Service (시작 준비)
+
+### 🎯 **Sprint 3 목표**
+현재 "HELLO GITHUB TRANSLATOR" 더미 텍스트를 **실제 한영/영한 번역**으로 교체하여 완전한 번역 기능 구현
+
+### 📋 **Sprint 3 태스크 목록**
+
+#### **Phase 1: Core Translation Engine (Tasks 3.1-3.2)**
+| 태스크 | 상태 | 설명 | 우선순위 |
+|--------|------|------|----------|
+| 3.1 TranslationService 구현 | 🔄 진행예정 | OpenAI Responses API 클라이언트 구현 | 🔥 High |
+| 3.2 Background Message Hub | 🔄 진행예정 | Content ↔ Background ↔ OpenAI 메시지 플로우 | 🔥 High |
+
+#### **Phase 2: Production Readiness (Tasks 3.3-3.4)**
+| 태스크 | 상태 | 설명 | 우선순위 |
+|--------|------|------|----------|
+| 3.3 Rate Limiting & Retry | ⏳ 대기 | Exponential backoff, 3회 재시도, 60 RPM 제한 | 🟡 Medium |
+| 3.4 API Key Management | ⏳ 대기 | 보안 저장, Options 페이지, 사용자 설정 UI | 🟡 Medium |
+
+#### **Phase 3: Integration (Task 3.5)**
+| 태스크 | 상태 | 설명 | 우선순위 |
+|--------|------|------|----------|
+| 3.5 Real Translation Integration | ⏳ 대기 | DOM Extractor와 연결, 실제 번역 결과 표시 | 🟢 Low |
+
+### 🔧 **Sprint 3 세부 구현 스펙**
+
+#### **3.1 TranslationService 클래스**
+```typescript
+// src/core/translation.ts
+class TranslationService {
+  private apiKey: string;
+  private endpoint = 'https://api.openai.com/v1/responses'; // ❗ Responses API
+  private model = 'gpt-4.1-mini-2025-04-14'; // ❗ 정확한 모델 버전
+  
+  async translateText(
+    text: string, 
+    direction: 'EN_TO_KO' | 'KO_TO_EN'
+  ): Promise<string>
+}
+```
+
+**핵심 기능**:
+- OpenAI Responses API 호출 (NOT Chat Completions)
+- 방향별 프롬프트 템플릿 (EN→KO, KO→EN)
+- Temperature: 0.0, Max tokens: 1024
+- 에러 핸들링 및 응답 파싱
+
+#### **3.2 Background Message Handler 확장**
+```typescript
+// src/background/index.ts enhancement
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'TRANSLATE') {
+    translationService.translateText(request.text, request.direction)
+      .then(result => sendResponse({ success: true, translatedText: result }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true; // 비동기 응답 필수
+  }
+});
+```
+
+**핵심 기능**:
+- Content Script로부터 번역 요청 수신
+- TranslationService 호출 및 결과 반환
+- 에러 상태 적절히 처리
+
+#### **3.3 Rate Limiting & Retry Policy**
+- **Exponential Backoff**: 100ms → 200ms → 400ms → 실패
+- **Max Retries**: 3회 (429/5xx 에러 시)
+- **Rate Limit**: OpenAI Tier 1 기준 60 RPM 고려
+- **Circuit Breaker**: 연속 실패 시 일시 중단
+
+#### **3.4 API Key 보안 저장**
+- **Storage**: `chrome.storage.sync` 사용
+- **UI**: Popup에 API 키 입력 필드 추가
+- **보안**: 로그에 절대 노출 금지
+- **Validation**: API 키 형식 검증
+
+#### **3.5 DOM Integration**
+```typescript
+// src/core/dom-extractor.ts 수정
+// "HELLO GITHUB TRANSLATOR" → 실제 번역 결과
+const translatedText = await chrome.runtime.sendMessage({
+  type: 'TRANSLATE',
+  text: originalTitle,
+  direction: 'EN_TO_KO'
+});
+```
+
+### 🎯 **번역 방향 및 프롬프트**
+
+#### **Read Path: English → Korean**
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "Translate the following GitHub discussion from English to Korean, preserving markdown."
+    },
+    {
+      "role": "user", 
+      "content": "${TEXT}"
+    }
+  ]
+}
+```
+
+#### **Write Path: Korean → English** (Sprint 4에서 구현)
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "Translate the following GitHub discussion from Korean to English, preserving markdown."
+    },
+    {
+      "role": "user",
+      "content": "${TEXT}"
+    }
+  ]
+}
+```
+
+### 🧪 **Sprint 3 테스트 전략**
+
+#### **Unit Tests (Jest + Nock)**
+```typescript
+describe('TranslationService', () => {
+  test('translates EN to KO via OpenAI Responses API', async () => {
+    // given
+    nock('https://api.openai.com')
+      .post('/v1/responses')
+      .reply(200, { choices: [{ message: { content: '안녕하세요' } }] });
+    
+    // when
+    const result = await service.translate('Hello', 'EN_TO_KO');
+    
+    // then
+    expect(result).toBe('안녕하세요');
+  });
+});
+```
+
+#### **Integration Tests**
+- Background ↔ Content 메시지 통신
+- API 키 저장/로드 플로우
+- 네트워크 오류 시나리오
+
+#### **E2E Tests (개발 중 OpenAI API 비용 절약)**
+- Mock API 서버로 전체 플로우 검증
+- 실제 GitHub 페이지에서 번역 동작 확인
+
+### ✅ **Sprint 3 완료 기준**
+
+**🎯 성공 조건**:
+- [ ] GitHub 이슈 제목이 **실제 한국어**로 번역되어 표시
+- [ ] API 키 설정 UI가 Popup에 완성
+- [ ] 네트워크 오류 시 적절한 에러 처리
+- [ ] 모든 단위 테스트 통과 (기존 14개 + 새로운 번역 테스트)
+- [ ] 빌드 및 타입 체크 성공
+
+**🚀 실제 동작 결과**:
+```
+🔍 Extracting titles for page type: issues_list
+🌐 Translating 5 titles from English to Korean...
+📋 Translation Results:
+📌 1. "Fix memory leak in transformer" → "트랜스포머의 메모리 누수 수정"
+📌 2. "Add support for new model" → "새로운 모델 지원 추가"
+...
+🎉 Sprint 3 Complete: Real translation working!
+```
+
+### 🎮 **작업 진행 순서**
+
+#### **Week 1 (Phase 1)**
+1. **Day 1-2**: TranslationService 구현 (3.1)
+2. **Day 3-4**: Background Message Handler (3.2)
+3. **Day 5**: Phase 1 통합 테스트
+
+#### **Week 2 (Phase 2-3)**
+4. **Day 1-2**: Rate Limiting & Retry (3.3)
+5. **Day 3-4**: API Key Management UI (3.4)
+6. **Day 5**: DOM Integration (3.5) + 최종 테스트
+
+---
+**마지막 업데이트**: 2024-12-19  
+**현재 스프린트**: Sprint 3 - OpenAI Integration & Translation Service (Task 3.1 시작 준비)
