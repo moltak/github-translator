@@ -42,7 +42,8 @@ if (window.location.hostname === 'github.com') {
         storage, 
         hasApiKey, 
         apiKeyExists: !!storage.openaiApiKey,
-        apiKeyLength: storage.openaiApiKey ? storage.openaiApiKey.length : 0 
+        apiKeyLength: storage.openaiApiKey ? storage.openaiApiKey.length : 0,
+        apiKeyPrefix: storage.openaiApiKey ? storage.openaiApiKey.substring(0, 8) + '...' : 'none'
       });
       
       if (hasApiKey) {

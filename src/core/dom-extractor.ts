@@ -226,11 +226,20 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
       element.textContent = `🔄 Translating...`;
       
       // Background Script에 번역 요청
-      const response = await chrome.runtime.sendMessage({
-        type: 'TRANSLATE',
-        text: originalText,
-        direction: 'EN_TO_KO'
-      });
+      console.log(`📡 Sending translation request for: "${originalText.substring(0, 30)}..."`);
+      
+      let response;
+      try {
+        response = await chrome.runtime.sendMessage({
+          type: 'TRANSLATE',
+          text: originalText,
+          direction: 'EN_TO_KO'
+        });
+        console.log(`📨 Received response:`, response);
+      } catch (messageError) {
+        console.error(`❌ Message sending failed:`, messageError);
+        throw new Error(`Message sending failed: ${messageError.message}`);
+      }
       
       if (response && response.success) {
         // 번역 성공
