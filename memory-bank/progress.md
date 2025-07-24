@@ -73,6 +73,40 @@
 - [Implementation Plan](./implementation-plan.md) - 상세 구현 계획
 - [Architecture](./architecture.md) - 시스템 아키텍처 설계
 
+## 🚀 Sprint 2 - DOM Extraction & Mutation (진행중)
+
+### 📋 Sprint 2 태스크 목록
+
+| 태스크 | 상태 | 설명 |
+|--------|------|------|
+| 2.1 Issue title scraper | ✅ 완료 | GitHub 이슈/PR 제목 추출 함수 구현 |
+| 2.2 Live MutationObserver | ⏳ 대기 | 페이지 네비게이션 시 실시간 제목 감지 |
+| 2.3 Replace titles | ⏳ 대기 | 제목을 "HELLO GITHUB TRANSLATOR"로 교체 |
+| 2.4 Console print | ✅ 완료 | 원본 제목들을 콘솔에 출력 |
+
+### ✅ Sprint 2.1 완료 (2024-12-19)
+
+**DOM Extractor 모듈 구현 완료:**
+- **src/core/dom-extractor.ts**: 페이지 타입별 제목 추출 로직
+- **다중 선택자 지원**: GitHub UI 변경에 대응하는 Fallback 선택자
+- **테스트 커버리지**: Jest 단위 테스트 10개 통과
+- **실시간 콘솔 출력**: 추출된 제목들을 구조화된 로그로 출력
+
+### 🎯 테스트 준비 완료
+
+**Extension 빌드 완료** - 이제 다음 URL에서 테스트 가능:
+- https://github.com/huggingface/transformers/issues (이슈 목록)
+- https://github.com/huggingface/transformers/issues/1 (개별 이슈)
+
+**예상 콘솔 출력:**
+```
+🔍 Extracting titles for page type: issues_list
+📋 Found X GitHub issue/PR titles:
+📌 1. [실제 이슈 제목]
+📌 2. [실제 이슈 제목]
+...
+```
+
 ---
-**마지막 업데이트**: 2024-12-19
-**다음 액션**: Sprint 1.1 - Repository 초기화 작업 시작
+**마지막 업데이트**: 2024-12-19  
+**다음 액션**: Extension 재로드 후 GitHub에서 제목 추출 기능 테스트
