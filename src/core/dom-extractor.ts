@@ -40,42 +40,115 @@ export function detectPageType(): GitHubPageInfo {
 
 /**
  * 페이지 타입별 제목 선택자를 반환합니다.
+ * GitHub의 CSS Modules로 인한 동적 클래스명에 대응합니다.
  */
 export function getTitleSelectors(pageType: GitHubPageInfo['type']): string[] {
   const selectors: Record<GitHubPageInfo['type'], string[]> = {
     issue: [
-      '.js-issue-title', // 이슈 상세 페이지 제목
-      'h1.gh-header-title .js-issue-title', // 새로운 GitHub UI
-      'bdi.js-issue-title', // 이슈 제목 요소
-      '.gh-header-title .js-issue-title',
-    ],
-    pull_request: [
-      '.js-issue-title', // PR 상세 페이지 제목 (이슈와 동일 구조)
+      '.js-issue-title', // 기존 선택자
       'h1.gh-header-title .js-issue-title',
       'bdi.js-issue-title',
       '.gh-header-title .js-issue-title',
+      // CSS Modules 패턴
+      '[class*="IssuePullRequestTitle-module"]',
+      '[class*="IssueTitle"]',
+      'h1[class*="gh-header-title"] span',
+    ],
+    pull_request: [
+      '.js-issue-title', // PR도 동일한 구조 사용
+      'h1.gh-header-title .js-issue-title',
+      'bdi.js-issue-title',
+      '.gh-header-title .js-issue-title',
+      // CSS Modules 패턴
+      '[class*="IssuePullRequestTitle-module"]',
+      '[class*="PullRequestTitle"]',
+      'h1[class*="gh-header-title"] span',
     ],
     issues_list: [
-      '.js-navigation-item [data-hovercard-type="issue"] .Link--primary', // 이슈 목록
-      '.js-navigation-item .h4 a', // 대체 선택자
-      '[data-testid="issue-title-link"]', // 새로운 테스트 ID
+      // CSS Modules 패턴이 먼저 오도록 수정
+      '[class*="IssuePullRequestTitle-module__ListItemTitle"]',
+      '[class*="ListItemTitle"]',
+      'a[class*="Link--primary"][class*="v-align-middle"]',
+      // 기존 선택자들
+      '.js-navigation-item [data-hovercard-type="issue"] .Link--primary',
+      '.js-navigation-item .h4 a',
+      '[data-testid="issue-title-link"]',
       '.js-navigation-item .Link--primary[data-hovercard-type="issue"]',
+      // 추가 일반적인 패턴
+      '.js-navigation-item a[href*="/issues/"]',
+      '.js-issue-row a[href*="/issues/"]',
     ],
     pulls_list: [
-      '.js-navigation-item [data-hovercard-type="pull_request"] .Link--primary', // PR 목록
-      '.js-navigation-item .h4 a', // 대체 선택자
-      '[data-testid="pr-title-link"]', // 새로운 테스트 ID
+      // CSS Modules 패턴
+      '[class*="IssuePullRequestTitle-module__ListItemTitle"]',
+      '[class*="ListItemTitle"]',
+      'a[class*="Link--primary"][class*="v-align-middle"]',
+      // 기존 선택자들
+      '.js-navigation-item [data-hovercard-type="pull_request"] .Link--primary',
+      '.js-navigation-item .h4 a',
+      '[data-testid="pr-title-link"]',
       '.js-navigation-item .Link--primary[data-hovercard-type="pull_request"]',
+      // 추가 일반적인 패턴
+      '.js-navigation-item a[href*="/pull/"]',
+      '.js-issue-row a[href*="/pull/"]',
     ],
     other: [
-      // 일반적인 GitHub 제목 선택자들
+      // CSS Modules 일반 패턴
+      '[class*="IssuePullRequestTitle-module"]',
+      '[class*="ListItemTitle"]',
+      // 기존 일반적인 선택자들
       '.js-issue-title',
       '.js-navigation-item .Link--primary',
       'h1.gh-header-title',
+      'a[href*="/issues/"]',
+      'a[href*="/pull/"]',
     ],
   };
   
   return selectors[pageType] || selectors.other;
+}
+
+/**
+ * 모든 가능한 제목 요소를 찾는 포괄적 검색
+ */
+export function findAllPossibleTitles(): ExtractedTitle[] {
+  const allSelectors = [
+    // CSS Modules 패턴
+    '[class*="IssuePullRequestTitle-module"]',
+    '[class*="ListItemTitle"]',
+    '[class*="IssueTitle"]',
+    '[class*="PullRequestTitle"]',
+    // GitHub 링크 패턴
+    'a[href*="/issues/"]',
+    'a[href*="/pull/"]',
+    // 기존 클래스들
+    '.js-issue-title',
+    '.Link--primary',
+    '.js-navigation-item a',
+  ];
+  
+  const foundTitles: ExtractedTitle[] = [];
+  
+  allSelectors.forEach((selector) => {
+    try {
+      const elements = document.querySelectorAll<HTMLElement>(selector);
+      elements.forEach((element, index) => {
+        const text = element.textContent?.trim() || '';
+        if (text && text.length > 3) { // 의미있는 텍스트만
+          foundTitles.push({
+            element,
+            text,
+            selector,
+            index,
+          });
+        }
+      });
+    } catch (error) {
+      console.warn(`⚠️ Invalid selector: ${selector}`, error);
+    }
+  });
+  
+  return foundTitles;
 }
 
 /**
@@ -91,27 +164,59 @@ export function getIssueTitles(): ExtractedTitle[] {
   
   // 각 선택자로 요소들을 찾아보기
   for (const selector of selectors) {
-    const elements = document.querySelectorAll<HTMLElement>(selector);
-    
-    if (elements.length > 0) {
-      console.log(`✅ Found ${elements.length} elements with selector: "${selector}"`);
+    try {
+      const elements = document.querySelectorAll<HTMLElement>(selector);
       
-      elements.forEach((element, index) => {
-        const text = element.textContent?.trim() || '';
-        if (text) {
-          extractedTitles.push({
-            element,
-            text,
-            selector,
-            index,
-          });
+      if (elements.length > 0) {
+        console.log(`✅ Found ${elements.length} elements with selector: "${selector}"`);
+        
+        elements.forEach((element, index) => {
+          const text = element.textContent?.trim() || '';
+          if (text && text.length > 3) { // 의미있는 텍스트만 추출
+            extractedTitles.push({
+              element,
+              text,
+              selector,
+              index,
+            });
+          }
+        });
+        
+        // 첫 번째로 매치되는 선택자 사용 (중복 방지)
+        if (extractedTitles.length > 0) {
+          break;
+        }
+      } else {
+        console.log(`❌ No elements found with selector: "${selector}"`);
+      }
+    } catch (error) {
+      console.warn(`⚠️ Invalid selector: "${selector}"`, error);
+    }
+  }
+  
+  // 선택자로 찾지 못한 경우, 포괄적 검색 실행
+  if (extractedTitles.length === 0) {
+    console.log('🔍 Running comprehensive search for titles...');
+    const allTitles = findAllPossibleTitles();
+    
+    if (allTitles.length > 0) {
+      console.log(`🎯 Found ${allTitles.length} potential titles via comprehensive search`);
+      allTitles.forEach((title, index) => {
+        if (index < 10) { // 처음 10개만 표시
+          console.log(`  🔎 ${index + 1}. "${title.text}" (${title.selector})`);
         }
       });
       
-      // 첫 번째로 매치되는 선택자 사용 (중복 방지)
-      break;
-    } else {
-      console.log(`❌ No elements found with selector: "${selector}"`);
+      // Issues/PRs 패턴 필터링
+      const filteredTitles = allTitles.filter(title => 
+        title.text.length > 10 && // 충분히 긴 텍스트
+        (title.element.href?.includes('/issues/') || 
+         title.element.href?.includes('/pull/') ||
+         title.selector.includes('Issue') ||
+         title.selector.includes('Pull'))
+      );
+      
+      extractedTitles.push(...filteredTitles.slice(0, 20)); // 최대 20개
     }
   }
   
@@ -119,10 +224,15 @@ export function getIssueTitles(): ExtractedTitle[] {
   if (extractedTitles.length > 0) {
     console.log(`📄 Extracted ${extractedTitles.length} titles:`);
     extractedTitles.forEach((title, index) => {
-      console.log(`  ${index + 1}. "${title.text}" (${title.selector})`);
+      console.log(`  📌 ${index + 1}. "${title.text}" (${title.selector})`);
     });
   } else {
     console.warn('⚠️ No titles found on this page');
+    
+    // 디버깅을 위한 추가 정보
+    console.log('🔍 Debug: Available elements on page:');
+    const debugElements = document.querySelectorAll('a, h1, h2, h3, [class*="title"], [class*="Title"]');
+    console.log(`Found ${debugElements.length} potential elements to analyze`);
   }
   
   return extractedTitles;

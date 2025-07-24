@@ -62,7 +62,7 @@ if (window.location.hostname === 'github.com') {
     // Sprint 2.1: 제목 추출 실행
     setTimeout(async () => {
       await extractAndLogTitles();
-    }, 1000); // GitHub의 동적 로딩을 위해 1초 대기
+    }, 2000); // GitHub의 동적 로딩을 위해 2초 대기 (CSS Modules 로딩 시간 고려)
   };
   
   if (document.readyState === 'loading') {
