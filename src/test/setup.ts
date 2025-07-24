@@ -1,4 +1,5 @@
 // Jest test setup file
+import 'whatwg-fetch';
 
 // Chrome Extension API mocks
 global.chrome = {
