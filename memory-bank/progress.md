@@ -80,8 +80,8 @@
 | 태스크 | 상태 | 설명 |
 |--------|------|------|
 | 2.1 Issue title scraper | ✅ 완료 | GitHub 이슈/PR 제목 추출 함수 구현 |
-| 2.2 Live MutationObserver | ⏳ 대기 | 페이지 네비게이션 시 실시간 제목 감지 |
-| 2.3 Replace titles | ⏳ 대기 | 제목을 "HELLO GITHUB TRANSLATOR"로 교체 |
+| 2.2 Live MutationObserver | ✅ 완료 | 향상된 실시간 DOM 변화 감지 및 페이지 네비게이션 추적 |
+| 2.3 Replace titles | ✅ 완료 | 제목을 "HELLO GITHUB TRANSLATOR"로 교체 및 원본 복원 |
 | 2.4 Console print | ✅ 완료 | 원본 제목들을 콘솔에 출력 |
 
 ### ✅ Sprint 2.1 완료 (2024-12-19)
@@ -98,15 +98,43 @@
 - https://github.com/huggingface/transformers/issues (이슈 목록)
 - https://github.com/huggingface/transformers/issues/1 (개별 이슈)
 
-**예상 콘솔 출력:**
+## ✅ Sprint 2.2 & 2.3 완료! (2024-12-19)
+
+**모든 Sprint 2 태스크가 성공적으로 완료되었습니다.**
+
+### 🎯 **Sprint 2.2 - Live MutationObserver 강화**
+- **향상된 DOM 감지**: GitHub의 SPA 네비게이션과 동적 콘텐츠 로딩 감지
+- **성능 최적화**: 디바운스된 재실행으로 불필요한 호출 방지
+- **스마트 필터링**: Issues/PRs 관련 요소만 선별적으로 감지
+- **설정 연동**: Extension 활성화/비활성화 상태에 따른 동적 동작
+
+### 🎯 **Sprint 2.3 - Title Replacement**
+- **즉시 교체**: 제목 추출과 동시에 "HELLO GITHUB TRANSLATOR"로 교체
+- **원본 백업**: 데이터 속성으로 원본 텍스트 안전 보관
+- **복원 기능**: 언제든지 원본 제목으로 되돌리기 가능
+- **중복 방지**: 이미 교체된 요소는 재교체하지 않음
+- **키보드 단축키**: `Ctrl + Shift + T`로 토글 가능
+
+### 🔧 **새로운 기능들**
+1. **설정 연동**: Popup에서 Extension 비활성화 시 자동으로 원본 복원
+2. **페이지 정리**: 페이지 종료 시 자동으로 원본 제목 복원
+3. **상태 추적**: 교체된 요소들을 Map으로 효율적 관리
+4. **테스트 커버리지**: 14개 단위 테스트 모두 통과
+
+### 🎮 **실제 사용법**
 ```
 🔍 Extracting titles for page type: issues_list
-📋 Found X GitHub issue/PR titles:
-📌 1. [실제 이슈 제목]
-📌 2. [실제 이슈 제목]
+📋 Found and replaced X GitHub issue/PR titles
+📜 Original titles before replacement:
+📌 1. [원본 이슈 제목 1]
+📌 2. [원본 이슈 제목 2]
 ...
+
+🎉 Sprint 2.3 Complete: Extracted and replaced X titles!
 ```
+
+**GitHub 페이지에서 모든 이슈/PR 제목이 "HELLO GITHUB TRANSLATOR"로 표시됩니다!**
 
 ---
 **마지막 업데이트**: 2024-12-19  
-**다음 액션**: Extension 재로드 후 GitHub에서 제목 추출 기능 테스트
+**다음 스프린트**: Sprint 3 - OpenAI Integration & Translation Service

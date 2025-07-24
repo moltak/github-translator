@@ -11,7 +11,12 @@ export interface ExtractedTitle {
   text: string;
   selector: string;
   index: number;
+  originalText?: string; // 원본 텍스트 백업
+  isReplaced?: boolean; // 교체 여부
 }
+
+// 교체된 요소들을 추적하기 위한 전역 Map
+const replacedElements = new Map<HTMLElement, string>();
 
 /**
  * GitHub 페이지 타입을 감지합니다.
@@ -140,6 +145,8 @@ export function findAllPossibleTitles(): ExtractedTitle[] {
             text,
             selector,
             index,
+            originalText: text,
+            isReplaced: false,
           });
         }
       });
@@ -149,6 +156,76 @@ export function findAllPossibleTitles(): ExtractedTitle[] {
   });
   
   return foundTitles;
+}
+
+/**
+ * 제목을 지정된 텍스트로 교체합니다.
+ * Sprint 2.3: Replace Titles
+ */
+export function replaceTitles(titles: ExtractedTitle[], replacementText = 'HELLO GITHUB TRANSLATOR'): number {
+  let replacedCount = 0;
+  
+  console.log(`🔄 Replacing ${titles.length} titles with "${replacementText}"`);
+  
+  titles.forEach((title, index) => {
+    try {
+      const { element } = title;
+      
+      // 이미 교체된 요소는 건너뛰기
+      if (replacedElements.has(element)) {
+        return;
+      }
+      
+      // 원본 텍스트 백업
+      const originalText = element.textContent?.trim() || '';
+      replacedElements.set(element, originalText);
+      
+      // 텍스트 교체
+      if (element.textContent) {
+        element.textContent = replacementText;
+        
+        // 데이터 속성으로 원본 텍스트 저장
+        element.setAttribute('data-original-title', originalText);
+        element.setAttribute('data-github-translator', 'replaced');
+        
+        console.log(`✅ ${index + 1}. Replaced: "${originalText}" → "${replacementText}"`);
+        replacedCount++;
+      }
+    } catch (error) {
+      console.error(`❌ Failed to replace title ${index + 1}:`, error);
+    }
+  });
+  
+  console.log(`🎯 Successfully replaced ${replacedCount} titles`);
+  return replacedCount;
+}
+
+/**
+ * 교체된 제목들을 원본으로 복원합니다.
+ */
+export function restoreTitles(): number {
+  let restoredCount = 0;
+  
+  console.log(`🔄 Restoring ${replacedElements.size} replaced titles`);
+  
+  replacedElements.forEach((originalText, element) => {
+    try {
+      if (element.textContent && element.hasAttribute('data-github-translator')) {
+        element.textContent = originalText;
+        element.removeAttribute('data-original-title');
+        element.removeAttribute('data-github-translator');
+        
+        console.log(`✅ Restored: "${originalText}"`);
+        restoredCount++;
+      }
+    } catch (error) {
+      console.error(`❌ Failed to restore title:`, error);
+    }
+  });
+  
+  replacedElements.clear();
+  console.log(`🎯 Successfully restored ${restoredCount} titles`);
+  return restoredCount;
 }
 
 /**
@@ -178,6 +255,8 @@ export function getIssueTitles(): ExtractedTitle[] {
               text,
               selector,
               index,
+              originalText: text,
+              isReplaced: replacedElements.has(element),
             });
           }
         });
@@ -224,7 +303,8 @@ export function getIssueTitles(): ExtractedTitle[] {
   if (extractedTitles.length > 0) {
     console.log(`📄 Extracted ${extractedTitles.length} titles:`);
     extractedTitles.forEach((title, index) => {
-      console.log(`  📌 ${index + 1}. "${title.text}" (${title.selector})`);
+      const status = title.isReplaced ? '🔄 (replaced)' : '📌';
+      console.log(`  ${status} ${index + 1}. "${title.text}" (${title.selector})`);
     });
   } else {
     console.warn('⚠️ No titles found on this page');
@@ -236,6 +316,23 @@ export function getIssueTitles(): ExtractedTitle[] {
   }
   
   return extractedTitles;
+}
+
+/**
+ * 제목을 추출하고 즉시 교체합니다.
+ * Sprint 2.3: 통합 함수
+ */
+export function extractAndReplaceTitles(replacementText = 'HELLO GITHUB TRANSLATOR'): ExtractedTitle[] {
+  const titles = getIssueTitles();
+  
+  if (titles.length > 0) {
+    const replacedCount = replaceTitles(titles, replacementText);
+    console.log(`🎉 Sprint 2.3 Complete: Extracted and replaced ${replacedCount} titles!`);
+  } else {
+    console.log('📭 No titles to replace');
+  }
+  
+  return titles;
 }
 
 /**
