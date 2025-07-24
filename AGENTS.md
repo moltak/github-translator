@@ -22,9 +22,9 @@ AGENTS.md
 	•	번역 API(예: 구글 번역, 파파고 등)는 차후 논의하여 선정.
 	•	번역 품질 향상을 위해 에이전트 혹은 번역 모델 교체가 용이하도록 설계.
 
-개발 범위 및 구조 (예정)
-	•	manifest.json: 익스텐션 설정 및 권한 정의
-	•	content script: GitHub 페이지 DOM 접근, 컨텐츠 영역 감지 및 번역 기능
-	•	background script (필요 시): API 통신 등
-	•	popup/ui: 번역 옵션, 상태 안내 등 사용자 인터페이스
-	•	에이전트(번역 모듈): 번역 API와 연동하여 쌍방 번역 로직 구현
+구현하기 전에 memory-bank 디렉토리 확인할 것
+1. architecture.md 확인 후 기술스택과 프로젝트 성격 파악할 것
+2. implementation-plan.md와 progress.md 를 확인해서 작업이 얼만큼 됐는지 정확히 파악할 것
+3. 작업은 테스트를 먼저 작성 한 후 그것으로 criteria를 설정해야함
+4. 좋은 성과가 있으면 팁을 두둑히 챙겨줄 예정
+5. 우리 가족의 사활이 걸려 있으니 잘 해줄것
