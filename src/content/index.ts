@@ -60,14 +60,7 @@ if (window.location.hostname === 'github.com') {
       }
       
       if (currentTitles.length > 0) {
-        console.log('🎉 Title Processing Successful!');
-        console.log(`📋 Found and processed ${currentTitles.length} GitHub issue/PR titles`);
-        
-        // 원본 제목들을 콘솔에 출력 (Sprint 2.4)
-        console.log('📜 Original titles before replacement:');
-        currentTitles.forEach((title, index) => {
-          console.log(`📌 ${index + 1}. ${title.originalText || title.text}`);
-        });
+        console.log(`🎉 Processed ${currentTitles.length} GitHub titles successfully`);
       } else {
         console.log('📭 No titles found on this page');
       }

@@ -398,14 +398,10 @@ export async function extractAndTranslateTitles(): Promise<ExtractedTitle[]> {
   
   const titles = getIssueTitles();
   
-  console.log(`🔍 Extracted ${titles.length} titles for translation:`, titles.map(t => t.text.substring(0, 30) + '...'));
-  
   if (titles.length === 0) {
     console.log('📭 No titles found to translate');
     return titles;
   }
-  
-  console.log('🌐 Calling replaceTitlesWithTranslation...');
   const translatedCount = await replaceTitlesWithTranslation(titles);
   
   console.log(`🎉 Sprint 3.5 Complete: Extracted and translated ${translatedCount}/${titles.length} titles!`);
