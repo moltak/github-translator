@@ -244,3 +244,175 @@ describe('DOM Extractor', () => {
     });
   });
 });
+
+describe('safeReplaceText - Complex HTML Structure Preservation', () => {
+  beforeEach(() => {
+    // DOM 초기화
+    document.body.innerHTML = '';
+  });
+
+  test('should preserve simple text elements (titles)', () => {
+    // 간단한 제목 요소 테스트
+    const titleElement = document.createElement('a');
+    titleElement.href = 'https://github.com/test/repo/issues/123';
+    titleElement.textContent = 'Fix bug in authentication';
+    document.body.appendChild(titleElement);
+
+    const titles: ExtractedTitle[] = [{
+      element: titleElement,
+      text: 'Fix bug in authentication',
+      selector: 'a',
+      index: 0,
+      originalText: 'Fix bug in authentication',
+      isReplaced: false
+    }];
+
+    const replaced = replaceTitles(titles, '인증 버그 수정');
+
+    expect(replaced).toBe(1);
+    expect(titleElement.textContent).toBe('인증 버그 수정');
+    expect(titleElement.href).toBe('https://github.com/test/repo/issues/123'); // href 보존 확인
+  });
+
+  test('should preserve complex HTML structure in PR descriptions', () => {
+    // 복잡한 마크다운 구조 테스트
+    const complexElement = document.createElement('div');
+    complexElement.className = 'markdown-body';
+    complexElement.innerHTML = `
+      <h2>Overview</h2>
+      <p>This PR fixes the authentication bug by:</p>
+      <ul>
+        <li>Adding proper validation</li>
+        <li>Implementing <code>retry logic</code></li>
+      </ul>
+      <p>See the <a href="/docs">documentation</a> for details.</p>
+    `;
+    document.body.appendChild(complexElement);
+
+    const descriptions: ExtractedTitle[] = [{
+      element: complexElement,
+      text: 'Overview This PR fixes...',
+      selector: '.markdown-body',
+      index: 0,
+      originalText: 'Overview This PR fixes...',
+      isReplaced: false
+    }];
+
+    const replaced = replaceTitles(descriptions, '개요. 이 PR은 다음과 같이 인증 버그를 수정합니다. 적절한 검증 추가. 재시도 로직 구현. 자세한 내용은 문서를 참조하세요.');
+
+    expect(replaced).toBe(1);
+    
+    // HTML 구조가 보존되었는지 확인
+    expect(complexElement.querySelector('h2')).toBeTruthy();
+    expect(complexElement.querySelector('ul')).toBeTruthy();
+    expect(complexElement.querySelector('li')).toBeTruthy();
+    expect(complexElement.querySelector('code')).toBeTruthy();
+    expect(complexElement.querySelector('a')).toBeTruthy();
+    
+    // 링크 href가 보존되었는지 확인
+    const link = complexElement.querySelector('a') as HTMLAnchorElement;
+    expect(link.href).toContain('/docs');
+    
+    // 텍스트가 번역되었는지 확인 (정확한 매칭은 어려우므로 일부 키워드만)
+    const textContent = complexElement.textContent || '';
+    expect(textContent).toContain('개요');
+    expect(textContent).toContain('인증');
+  });
+
+  test('should handle nested HTML elements safely', () => {
+    // 중첩된 구조 테스트
+    const nestedElement = document.createElement('div');
+    nestedElement.innerHTML = `
+      <div>
+        <p>Outer paragraph with <strong>bold text</strong> and <em>italic text</em>.</p>
+        <div>
+          <span>Nested span content</span>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(nestedElement);
+
+    const items: ExtractedTitle[] = [{
+      element: nestedElement,
+      text: 'Outer paragraph...',
+      selector: 'div',
+      index: 0,
+      originalText: 'Outer paragraph...',
+      isReplaced: false
+    }];
+
+    const replaced = replaceTitles(items, '외부 단락의 굵은 텍스트와 기울임 텍스트. 중첩된 스팬 내용.');
+
+    expect(replaced).toBe(1);
+    
+    // 중첩 구조 보존 확인
+    expect(nestedElement.querySelector('p')).toBeTruthy();
+    expect(nestedElement.querySelector('strong')).toBeTruthy();
+    expect(nestedElement.querySelector('em')).toBeTruthy();
+    expect(nestedElement.querySelector('span')).toBeTruthy();
+    
+    // 텍스트 번역 확인
+    const textContent = nestedElement.textContent || '';
+    expect(textContent).toContain('외부');
+    expect(textContent).toContain('중첩된');
+  });
+
+  test('should detect simple vs complex elements correctly', () => {
+    // 간단한 요소
+    const simpleDiv = document.createElement('div');
+    simpleDiv.textContent = 'Simple text only';
+    
+    // 복잡한 요소
+    const complexDiv = document.createElement('div');
+    complexDiv.innerHTML = '<p>Has paragraph</p>';
+    
+    // 여기서는 내부 함수를 테스트할 수 없으므로, 
+    // 실제 replaceTitles 동작으로 간접 테스트
+    document.body.appendChild(simpleDiv);
+    document.body.appendChild(complexDiv);
+
+    const simpleItems: ExtractedTitle[] = [{
+      element: simpleDiv,
+      text: 'Simple text only',
+      selector: 'div',
+      index: 0,
+      originalText: 'Simple text only',
+      isReplaced: false
+    }];
+
+    const complexItems: ExtractedTitle[] = [{
+      element: complexDiv,
+      text: 'Has paragraph',
+      selector: 'div',
+      index: 0,
+      originalText: 'Has paragraph',
+      isReplaced: false
+    }];
+
+    // 둘 다 번역되어야 함 (다른 방식으로)
+    expect(replaceTitles(simpleItems, '간단한 텍스트만')).toBe(1);
+    expect(replaceTitles(complexItems, '단락이 있음')).toBe(1);
+    
+    expect(simpleDiv.textContent).toBe('간단한 텍스트만');
+    expect(complexDiv.querySelector('p')).toBeTruthy(); // 구조 보존 확인
+  });
+
+  test('should handle empty or whitespace-only elements', () => {
+    const emptyElement = document.createElement('div');
+    emptyElement.innerHTML = '<p>   </p><div>\n\t</div>';
+    document.body.appendChild(emptyElement);
+
+    const items: ExtractedTitle[] = [{
+      element: emptyElement,
+      text: '',
+      selector: 'div',
+      index: 0,
+      originalText: '',
+      isReplaced: false
+    }];
+
+    // 빈 요소는 번역하지 않아야 함
+    const replaced = replaceTitles(items, '번역된 텍스트');
+    expect(replaced).toBe(0); // 텍스트가 없으므로 교체되지 않음
+  });
+});

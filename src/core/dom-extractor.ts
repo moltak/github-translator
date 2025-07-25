@@ -159,21 +159,130 @@ export function findAllPossibleTitles(): ExtractedTitle[] {
 }
 
 /**
- * 요소의 텍스트만 안전하게 교체합니다 (HTML 구조 유지)
+ * 요소의 텍스트만 안전하게 교체합니다 (HTML 구조 완전 보존)
+ * 복잡한 마크다운 렌더링 구조도 안전하게 처리합니다.
  */
 function safeReplaceText(element: HTMLElement, newText: string): void {
-  // <a> 태그인 경우 내부 텍스트만 교체하여 링크 기능 유지
-  if (element.tagName === 'A') {
-    // 기존 href 속성 유지
-    const originalHref = (element as HTMLAnchorElement).href;
-    element.textContent = newText;
-    // href가 변경되었다면 복원
-    if (originalHref && (element as HTMLAnchorElement).href !== originalHref) {
-      (element as HTMLAnchorElement).href = originalHref;
+  // 간단한 요소 (제목 등): 직접 텍스트 교체
+  if (isSimpleTextElement(element)) {
+    if (element.tagName === 'A') {
+      // <a> 태그인 경우 href 속성 보존
+      const originalHref = (element as HTMLAnchorElement).href;
+      element.textContent = newText;
+      if (originalHref && (element as HTMLAnchorElement).href !== originalHref) {
+        (element as HTMLAnchorElement).href = originalHref;
+      }
+    } else {
+      element.textContent = newText;
     }
-  } else {
-    // 일반 요소는 textContent 교체
-    element.textContent = newText;
+    return;
+  }
+
+  // 복잡한 구조 (PR 설명 등): 텍스트 노드만 안전하게 교체
+  replaceTextNodesOnly(element, newText);
+}
+
+/**
+ * 요소가 간단한 텍스트 요소인지 확인합니다.
+ */
+function isSimpleTextElement(element: HTMLElement): boolean {
+  // 자식 요소가 없거나, 텍스트만 있는 간단한 구조
+  const hasComplexChildren = element.querySelectorAll('p, div, ul, ol, li, h1, h2, h3, h4, h5, h6, code, pre, img, table').length > 0;
+  return !hasComplexChildren;
+}
+
+/**
+ * HTML 구조를 보존하면서 텍스트 노드만 번역합니다.
+ * TreeWalker를 사용하여 안전하게 처리합니다.
+ */
+function replaceTextNodesOnly(element: HTMLElement, newText: string): void {
+  // 원본 텍스트 수집
+  const textNodes: Text[] = [];
+  const walker = document.createTreeWalker(
+    element,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: (node: Node): number => {
+        const text = node.textContent?.trim() || '';
+        // 의미있는 텍스트만 수집 (공백, 줄바꿈 제외)
+        if (text.length > 2 && !isWhitespaceOnly(text)) {
+          return NodeFilter.FILTER_ACCEPT;
+        }
+        return NodeFilter.FILTER_REJECT;
+      }
+    },
+    false
+  );
+
+  let textNode;
+  while (textNode = walker.nextNode()) {
+    textNodes.push(textNode as Text);
+  }
+
+  if (textNodes.length === 0) {
+    console.warn('⚠️ No meaningful text nodes found in complex element');
+    return;
+  }
+
+  // 번역된 텍스트를 문장 단위로 분할
+  const sentences = splitIntoSentences(newText);
+  
+  // 원본 텍스트 노드와 번역 문장을 매핑
+  distributeTranslatedText(textNodes, sentences);
+}
+
+/**
+ * 텍스트가 공백만 있는지 확인합니다.
+ */
+function isWhitespaceOnly(text: string): boolean {
+  return /^\s*$/.test(text);
+}
+
+/**
+ * 번역된 텍스트를 문장 단위로 분할합니다.
+ */
+function splitIntoSentences(text: string): string[] {
+  // 문장 구분자로 분할 (한글, 영어 지원)
+  const sentences = text.split(/[.!?。！？]\s+/).filter(s => s.trim().length > 0);
+  
+  // 마지막 문장에 구분자가 없는 경우 처리
+  if (sentences.length === 0) {
+    return [text.trim()];
+  }
+  
+  return sentences.map(s => s.trim());
+}
+
+/**
+ * 번역된 문장들을 텍스트 노드에 적절히 분배합니다.
+ */
+function distributeTranslatedText(textNodes: Text[], sentences: string[]): void {
+  if (textNodes.length === 0 || sentences.length === 0) return;
+
+  // 첫 번째 텍스트 노드에 전체 번역 결과 할당
+  if (textNodes.length === 1) {
+    textNodes[0].textContent = sentences.join('. ');
+    return;
+  }
+
+  // 여러 텍스트 노드가 있는 경우, 문장을 분배
+  let sentenceIndex = 0;
+  
+  textNodes.forEach((textNode, nodeIndex) => {
+    if (sentenceIndex < sentences.length) {
+      textNode.textContent = sentences[sentenceIndex];
+      sentenceIndex++;
+    } else {
+      // 번역 문장이 부족한 경우, 빈 텍스트로 설정
+      textNode.textContent = '';
+    }
+  });
+
+  // 남은 문장이 있는 경우, 마지막 노드에 추가
+  if (sentenceIndex < sentences.length) {
+    const remainingSentences = sentences.slice(sentenceIndex);
+    const lastNode = textNodes[textNodes.length - 1];
+    lastNode.textContent += ' ' + remainingSentences.join('. ');
   }
 }
 
@@ -195,18 +304,22 @@ export function replaceTitles(titles: ExtractedTitle[], replacementText = 'HELLO
       
       // 원본 텍스트 백업
       const originalText = element.textContent?.trim() || '';
+      
+      // 빈 텍스트나 의미없는 텍스트는 건너뛰기
+      if (!originalText || originalText.length < 3) {
+        return;
+      }
+      
       replacedElements.set(element, originalText);
       
       // 텍스트 교체 (HTML 구조 유지)
-      if (element.textContent) {
-        safeReplaceText(element, replacementText);
-        
-        // 데이터 속성으로 원본 텍스트 저장
-        element.setAttribute('data-original-title', originalText);
-        element.setAttribute('data-github-translator', 'replaced');
-        
-        replacedCount++;
-      }
+      safeReplaceText(element, replacementText);
+      
+      // 데이터 속성으로 원본 텍스트 저장
+      element.setAttribute('data-original-title', originalText);
+      element.setAttribute('data-github-translator', 'replaced');
+      
+      replacedCount++;
     } catch (error) {
       console.error(`❌ Failed to replace title ${index + 1}:`, error);
     }
