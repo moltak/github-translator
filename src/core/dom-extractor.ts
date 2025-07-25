@@ -159,6 +159,25 @@ export function findAllPossibleTitles(): ExtractedTitle[] {
 }
 
 /**
+ * 요소의 텍스트만 안전하게 교체합니다 (HTML 구조 유지)
+ */
+function safeReplaceText(element: HTMLElement, newText: string): void {
+  // <a> 태그인 경우 내부 텍스트만 교체하여 링크 기능 유지
+  if (element.tagName === 'A') {
+    // 기존 href 속성 유지
+    const originalHref = (element as HTMLAnchorElement).href;
+    element.textContent = newText;
+    // href가 변경되었다면 복원
+    if (originalHref && (element as HTMLAnchorElement).href !== originalHref) {
+      (element as HTMLAnchorElement).href = originalHref;
+    }
+  } else {
+    // 일반 요소는 textContent 교체
+    element.textContent = newText;
+  }
+}
+
+/**
  * 제목을 지정된 텍스트로 교체합니다.
  * Sprint 2.3: Replace Titles
  */
@@ -178,9 +197,9 @@ export function replaceTitles(titles: ExtractedTitle[], replacementText = 'HELLO
       const originalText = element.textContent?.trim() || '';
       replacedElements.set(element, originalText);
       
-      // 텍스트 교체
+      // 텍스트 교체 (HTML 구조 유지)
       if (element.textContent) {
-        element.textContent = replacementText;
+        safeReplaceText(element, replacementText);
         
         // 데이터 속성으로 원본 텍스트 저장
         element.setAttribute('data-original-title', originalText);
@@ -223,7 +242,7 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
       // 원본 텍스트 백업 및 로딩 표시
       element.setAttribute('data-original-title', originalText);
       element.setAttribute('data-github-translator', 'translating');
-      element.textContent = `🔄 Translating...`;
+      safeReplaceText(element, `🔄 Translating...`);
       
       // Background Script에 번역 요청
       console.log(`📡 Sending translation request for: "${originalText.substring(0, 30)}..."`);
@@ -242,8 +261,8 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
       }
       
       if (response && response.success) {
-        // 번역 성공
-        element.textContent = response.translatedText;
+        // 번역 성공 (HTML 구조 유지)
+        safeReplaceText(element, response.translatedText);
         element.setAttribute('data-github-translator', 'translated');
         replacedElements.set(element, originalText);
         
@@ -253,7 +272,7 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
         const errorMsg = response?.error || 'Translation failed';
         console.error(`❌ Translation failed: ${errorMsg}`);
         
-        element.textContent = originalText;
+        safeReplaceText(element, originalText);
         element.setAttribute('data-github-translator', 'error');
         element.setAttribute('data-translation-error', errorMsg);
       }
@@ -263,7 +282,7 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
       
       // 에러 시 원본 복원
       const originalText = title.element.getAttribute('data-original-title') || title.element.textContent || '';
-      title.element.textContent = originalText;
+      safeReplaceText(title.element, originalText);
       title.element.setAttribute('data-github-translator', 'error');
       title.element.setAttribute('data-translation-error', error instanceof Error ? error.message : 'Unknown error');
     }
@@ -282,7 +301,7 @@ export function restoreTitles(): number {
   replacedElements.forEach((originalText, element) => {
     try {
       if (element.textContent && element.hasAttribute('data-github-translator')) {
-        element.textContent = originalText;
+        safeReplaceText(element, originalText);
         element.removeAttribute('data-original-title');
         element.removeAttribute('data-github-translator');
         
