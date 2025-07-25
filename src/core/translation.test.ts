@@ -1,4 +1,5 @@
 import { TranslationService, TranslationDirection } from './translation';
+import { resetTranslationCache } from './cache';
 
 // Mock fetch globally
 const mockFetch = jest.fn();
@@ -11,6 +12,7 @@ describe('TranslationService', () => {
   beforeEach(() => {
     translationService = new TranslationService(mockApiKey);
     mockFetch.mockClear();
+    resetTranslationCache(); // Reset cache for each test
   });
 
   describe('translateText', () => {
@@ -252,6 +254,77 @@ describe('TranslationService', () => {
       await expect(
         translationService.translateText(inputText, TranslationDirection.EN_TO_KO)
       ).rejects.toThrow('Network error: Failed to fetch');
+    });
+
+    test('uses cache for repeated translations', async () => {
+      // given
+      const inputText = 'Hello world';
+      const expectedTranslation = '안녕 세상';
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ output_text: expectedTranslation })
+      });
+
+      // when
+      const result1 = await translationService.translateText(inputText, TranslationDirection.EN_TO_KO);
+      const result2 = await translationService.translateText(inputText, TranslationDirection.EN_TO_KO);
+
+      // then
+      expect(result1).toBe(expectedTranslation);
+      expect(result2).toBe(expectedTranslation);
+      expect(mockFetch).toHaveBeenCalledTimes(1); // Should only call API once
+    });
+
+    test('distinguishes cache by translation direction', async () => {
+      // given
+      const inputText = 'Test text';
+      const enToKoTranslation = '테스트 텍스트';
+      const koToEnTranslation = 'Test text translated';
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ output_text: enToKoTranslation })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ output_text: koToEnTranslation })
+        });
+
+      // when
+      const result1 = await translationService.translateText(inputText, TranslationDirection.EN_TO_KO);
+      const result2 = await translationService.translateText(inputText, TranslationDirection.KO_TO_EN);
+      const result3 = await translationService.translateText(inputText, TranslationDirection.EN_TO_KO); // Should use cache
+
+      // then
+      expect(result1).toBe(enToKoTranslation);
+      expect(result2).toBe(koToEnTranslation);
+      expect(result3).toBe(enToKoTranslation);
+      expect(mockFetch).toHaveBeenCalledTimes(2); // Should call API twice (different directions)
+    });
+
+    test('stores translation in cache after successful API call', async () => {
+      // given
+      const inputText = 'Cache test';
+      const expectedTranslation = '캐시 테스트';
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ output_text: expectedTranslation })
+      });
+
+      // when
+      const result = await translationService.translateText(inputText, TranslationDirection.EN_TO_KO);
+
+      // then
+      expect(result).toBe(expectedTranslation);
+      
+      // Verify cache by making another call (should not trigger API)
+      mockFetch.mockClear();
+      const cachedResult = await translationService.translateText(inputText, TranslationDirection.EN_TO_KO);
+      expect(cachedResult).toBe(expectedTranslation);
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 

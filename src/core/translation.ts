@@ -1,3 +1,5 @@
+import { getTranslationCache } from './cache';
+
 export enum TranslationDirection {
   EN_TO_KO = 'EN_TO_KO',
   KO_TO_EN = 'KO_TO_EN'
@@ -42,6 +44,14 @@ export class TranslationService {
   }
 
   async translateText(text: string, direction: TranslationDirection): Promise<string> {
+    const cache = getTranslationCache();
+    
+    // 캐시에서 먼저 조회
+    const cachedResult = cache.getTranslation(text, direction);
+    if (cachedResult) {
+      return cachedResult;
+    }
+
     const requestPayload = this.buildRequestPayload(text, direction);
 
     try {
@@ -59,7 +69,12 @@ export class TranslationService {
       }
 
       const data: OpenAIResponse = await response.json();
-      return this.extractTranslationFromResponse(data);
+      const translatedText = this.extractTranslationFromResponse(data);
+      
+      // 번역 결과를 캐시에 저장
+      cache.setTranslation(text, direction, translatedText);
+      
+      return translatedText;
 
     } catch (error) {
       this.handleNetworkError(error);
