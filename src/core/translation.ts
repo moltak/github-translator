@@ -3,23 +3,22 @@ export enum TranslationDirection {
   KO_TO_EN = 'KO_TO_EN'
 }
 
-interface OpenAIMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
+
 
 interface OpenAIRequest {
   model: string;
-  messages: OpenAIMessage[];
+  input: string;
   temperature: number;
-  max_tokens: number;
+  max_output_tokens: number;
 }
 
 interface OpenAIResponse {
-  choices: Array<{
-    message: {
-      content: string;
-    };
+  output_text?: string;
+  output?: Array<{
+    content?: Array<{
+      text?: string;
+      type: string;
+    }>;
   }>;
 }
 
@@ -70,21 +69,13 @@ export class TranslationService {
 
   private buildRequestPayload(text: string, direction: TranslationDirection): OpenAIRequest {
     const systemPrompt = this.getSystemPrompt(direction);
+    const userPrompt = `${systemPrompt}\n\nText to translate: ${text}`;
     
     return {
       model: this.model,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: text
-        }
-      ],
+      input: userPrompt,
       temperature: 0.0,
-      max_tokens: 1024
+      max_output_tokens: 1024
     };
   }
 
@@ -135,19 +126,30 @@ export class TranslationService {
   }
 
   private extractTranslationFromResponse(data: OpenAIResponse): string {
-    if (!data.choices || !Array.isArray(data.choices)) {
-      throw new Error('Invalid response format from OpenAI API');
+    // First try to get output_text directly
+    if (data.output_text && typeof data.output_text === 'string') {
+      return data.output_text.trim();
     }
 
-    if (data.choices.length === 0) {
-      throw new Error('No translation choices returned from OpenAI API');
+    // Fallback to parsing output array
+    if (!data.output || !Array.isArray(data.output)) {
+      throw new Error('Invalid response format from OpenAI Responses API');
     }
 
-    const choice = data.choices[0];
-    if (!choice.message || typeof choice.message.content !== 'string') {
-      throw new Error('Invalid response format from OpenAI API');
+    if (data.output.length === 0) {
+      throw new Error('No output returned from OpenAI Responses API');
     }
 
-    return choice.message.content.trim();
+    const output = data.output[0];
+    if (!output.content || !Array.isArray(output.content)) {
+      throw new Error('Invalid output format from OpenAI Responses API');
+    }
+
+    const textContent = output.content.find(item => item.type === 'output_text');
+    if (!textContent || typeof textContent.text !== 'string') {
+      throw new Error('No text content found in OpenAI Responses API output');
+    }
+
+    return textContent.text.trim();
   }
 }
