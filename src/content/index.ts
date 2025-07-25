@@ -1,6 +1,6 @@
 // Content Script for GitHub Translator Extension
 
-import { getIssueTitles, detectPageType, waitForDOM, extractAndReplaceTitles, extractAndTranslateTitles, restoreTitles } from '../core/dom-extractor';
+import { getIssueTitles, detectPageType, waitForDOM, extractAndReplaceTitles, extractAndTranslateTitles, restoreTitles, getPRDescription, extractAndTranslatePRDescription } from '../core/dom-extractor';
 
 console.log('🚀 Hello GitHub Translator - Content Script Loaded!');
 
@@ -47,9 +47,17 @@ if (window.location.hostname === 'github.com') {
       });
       
       if (hasApiKey) {
-        console.log('🎯 Sprint 3.5 - Real Translation Starting...');
+        console.log('🎯 Sprint 3.5 & 3.6 - Real Translation Starting...');
         try {
+          // 제목 번역
           currentTitles = await extractAndTranslateTitles();
+          
+          // PR/Issue 페이지인 경우 설명도 번역
+          if (pageInfo.type === 'pull_request' || pageInfo.type === 'issue') {
+            console.log('📝 Also translating PR/Issue description...');
+            const descriptionCount = await extractAndTranslatePRDescription();
+            console.log(`📋 Translated ${descriptionCount} description(s)`);
+          }
         } catch (error) {
           console.error('❌ Real translation failed, falling back to demo mode:', error);
           currentTitles = extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
@@ -79,6 +87,16 @@ if (window.location.hostname === 'github.com') {
     }
   };
   
+  // Sprint 3.6: PR 설명 감지 테스트
+  const testPRDescriptionDetection = () => {
+    console.log('🔍 Testing PR description detection...');
+    const descriptions = getPRDescription();
+    console.log(`📋 Found ${descriptions.length} PR description(s):`);
+    descriptions.forEach((desc, index) => {
+      console.log(`  ${index + 1}. "${desc.text.substring(0, 100)}..." (${desc.selector})`);
+    });
+  };
+
   // Demo: Background Script와 통신 테스트
   const testBackgroundCommunication = async () => {
     try {
@@ -219,6 +237,13 @@ if (window.location.hostname === 'github.com') {
   
   // 키보드 단축키로 토글 (개발용)
   document.addEventListener('keydown', (event) => {
+    // Ctrl + Shift + P로 PR 설명 감지 테스트
+    if (event.ctrlKey && event.shiftKey && event.key === 'P') {
+      event.preventDefault();
+      testPRDescriptionDetection();
+      return;
+    }
+    
     // Ctrl + Shift + T로 제목 토글
     if (event.ctrlKey && event.shiftKey && event.key === 'T') {
       event.preventDefault();

@@ -318,6 +318,59 @@ export function restoreTitles(): number {
 }
 
 /**
+ * PR 설명 영역을 추출합니다.
+ * Sprint 3.6: PR Description Translation
+ */
+export function getPRDescription(): ExtractedTitle[] {
+  const pageInfo = detectPageType();
+  
+  // PR 페이지가 아니면 빈 배열 반환
+  if (pageInfo.type !== 'pull_request' && pageInfo.type !== 'issue') {
+    return [];
+  }
+  
+  const prDescriptionSelectors = [
+    '.js-comment-body',                    // 메인 설명 영역
+    '.comment-body',                       // 대체 선택자
+    '.markdown-body',                      // 마크다운 렌더링 영역
+    '.js-task-list-container',             // 체크리스트 포함 영역
+    '[data-testid="issue-body"]',          // 최신 GitHub 테스트 ID
+    '.timeline-comment-wrapper:first-child .comment-body',  // 첫 번째 댓글 (PR 설명)
+  ];
+  
+  const extractedDescriptions: ExtractedTitle[] = [];
+  
+  for (const selector of prDescriptionSelectors) {
+    try {
+      const elements = document.querySelectorAll<HTMLElement>(selector);
+      
+      elements.forEach((element, index) => {
+        const text = element.textContent?.trim() || '';
+        
+        // 의미있는 텍스트가 있고, 이미 추출되지 않은 요소만 처리
+        if (text && text.length > 20 && !extractedDescriptions.some(desc => desc.element === element)) {
+          extractedDescriptions.push({
+            element,
+            text,
+            selector,
+            index,
+            originalText: text,
+            isReplaced: false,
+          });
+          
+          console.log(`📝 Found PR description: "${text.substring(0, 50)}..." (${selector})`);
+        }
+      });
+    } catch (error) {
+      console.warn(`⚠️ Invalid PR description selector: ${selector}`, error);
+    }
+  }
+  
+  console.log(`📋 Found ${extractedDescriptions.length} PR description(s)`);
+  return extractedDescriptions;
+}
+
+/**
  * GitHub 이슈/PR 제목들을 추출합니다.
  */
 export function getIssueTitles(): ExtractedTitle[] {
@@ -425,6 +478,24 @@ export async function extractAndTranslateTitles(): Promise<ExtractedTitle[]> {
   
   console.log(`🎉 Sprint 3.5 Complete: Extracted and translated ${translatedCount}/${titles.length} titles!`);
   return titles;
+}
+
+/**
+ * Sprint 3.6: PR 설명을 추출하고 번역합니다.
+ */
+export async function extractAndTranslatePRDescription(): Promise<number> {
+  console.log('🚀 Sprint 3.6 - PR Description Translation Starting...');
+  
+  const descriptions = getPRDescription();
+  if (descriptions.length === 0) {
+    console.log('📭 No PR descriptions found to translate');
+    return 0;
+  }
+  
+  const successCount = await replaceTitlesWithTranslation(descriptions);
+  console.log(`🎉 Sprint 3.6 Complete: Translated ${successCount}/${descriptions.length} PR description(s)!`);
+  
+  return successCount;
 }
 
 /**
