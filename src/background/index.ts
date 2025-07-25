@@ -17,21 +17,24 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 // Content Script로부터 메시지 수신 (번역 기능 통합)
-chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('🎧 Background received message:', request);
   
   // Handle translation requests
   if (request.type === 'TRANSLATE') {
     console.log('🔄 Processing TRANSLATE message...');
-    try {
-      const handled = await handleTranslationMessage(request, sender, sendResponse);
-      console.log('✅ Translation message handled:', handled);
-      return handled;
-    } catch (error) {
-      console.error('❌ Error handling translation message:', error);
-      sendResponse({ success: false, error: error.message });
-      return true;
-    }
+    
+    // Handle async translation
+    handleTranslationMessage(request, sender, sendResponse)
+      .then((handled) => {
+        console.log('✅ Translation message handled:', handled);
+      })
+      .catch((error) => {
+        console.error('❌ Error handling translation message:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    
+    return true; // Indicates async response
   }
   
   // Handle legacy demo messages

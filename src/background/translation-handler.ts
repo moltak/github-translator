@@ -126,10 +126,13 @@ export async function handleTranslationMessage(
       direction: request.direction
     });
 
-    sendResponse({
+    const response = {
       success: true,
       translatedText
-    });
+    };
+    
+    console.log('📤 Sending response:', response);
+    sendResponse(response);
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown translation error';
@@ -140,10 +143,13 @@ export async function handleTranslationMessage(
       direction: request.direction
     });
 
-    sendResponse({
+    const errorResponse = {
       success: false,
       error: errorMessage
-    });
+    };
+    
+    console.log('📤 Sending error response:', errorResponse);
+    sendResponse(errorResponse);
   }
 
   return true; // Indicates we will send response asynchronously
