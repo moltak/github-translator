@@ -22,13 +22,7 @@ describe('TranslationService', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          choices: [
-            {
-              message: {
-                content: expectedTranslation
-              }
-            }
-          ]
+          output_text: expectedTranslation
         })
       });
 
@@ -57,13 +51,7 @@ describe('TranslationService', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          choices: [
-            {
-              message: {
-                content: expectedTranslation
-              }
-            }
-          ]
+          output_text: expectedTranslation
         })
       });
 
@@ -83,7 +71,7 @@ describe('TranslationService', () => {
         capturedRequestBody = JSON.parse(options.body);
         return {
           ok: true,
-          json: async () => ({ choices: [{ message: { content: '안녕 세상' } }] })
+          json: async () => ({ output_text: '안녕 세상' })
         };
       });
 
@@ -93,18 +81,9 @@ describe('TranslationService', () => {
       // then
       expect(capturedRequestBody).toEqual({
         model: 'gpt-4.1-mini-2025-04-14',
-        messages: [
-          {
-            role: 'system',
-            content: 'Translate the following GitHub discussion from English to Korean, preserving markdown.'
-          },
-          {
-            role: 'user',
-            content: inputText
-          }
-        ],
+        input: 'Translate the following GitHub discussion from English to Korean, preserving markdown.\n\nText to translate: Hello world',
         temperature: 0.0,
-        max_tokens: 1024
+        max_output_tokens: 1024
       });
     });
 
@@ -117,7 +96,7 @@ describe('TranslationService', () => {
         capturedRequestBody = JSON.parse(options.body);
         return {
           ok: true,
-          json: async () => ({ choices: [{ message: { content: 'Hello world' } }] })
+          json: async () => ({ output_text: 'Hello world' })
         };
       });
 
@@ -127,18 +106,9 @@ describe('TranslationService', () => {
       // then
       expect(capturedRequestBody).toEqual({
         model: 'gpt-4.1-mini-2025-04-14',
-        messages: [
-          {
-            role: 'system',
-            content: 'Translate the following GitHub discussion from Korean to English, preserving markdown.'
-          },
-          {
-            role: 'user',
-            content: inputText
-          }
-        ],
+        input: 'Translate the following GitHub discussion from Korean to English, preserving markdown.\n\nText to translate: 안녕 세상',
         temperature: 0.0,
-        max_tokens: 1024
+        max_output_tokens: 1024
       });
     });
 
@@ -151,7 +121,7 @@ describe('TranslationService', () => {
         capturedHeaders = options.headers;
         return {
           ok: true,
-          json: async () => ({ choices: [{ message: { content: 'Translated text' } }] })
+          json: async () => ({ output_text: 'Translated text' })
         };
       });
 
@@ -194,7 +164,7 @@ describe('TranslationService', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          // Missing choices array
+          // Missing output_text and output array
           invalid: 'response'
         })
       });
@@ -202,24 +172,24 @@ describe('TranslationService', () => {
       // when & then
       await expect(
         translationService.translateText(inputText, TranslationDirection.EN_TO_KO)
-      ).rejects.toThrow('Invalid response format from OpenAI API');
+      ).rejects.toThrow('Invalid response format from OpenAI Responses API');
     });
 
-    test('throws error when choices array is empty', async () => {
+    test('throws error when output array is empty', async () => {
       // given
       const inputText = 'Test text';
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          choices: []
+          output: []
         })
       });
 
       // when & then
       await expect(
         translationService.translateText(inputText, TranslationDirection.EN_TO_KO)
-      ).rejects.toThrow('No translation choices returned from OpenAI API');
+      ).rejects.toThrow('No output returned from OpenAI Responses API');
     });
 
     test('handles network timeout error', async () => {
@@ -243,7 +213,7 @@ describe('TranslationService', () => {
         capturedRequestBody = JSON.parse(options.body);
         return {
           ok: true,
-          json: async () => ({ choices: [{ message: { content: '**굵은 텍스트**와 `코드 스니펫` 그리고 [링크](url)' } }] })
+          json: async () => ({ output_text: '**굵은 텍스트**와 `코드 스니펫` 그리고 [링크](url)' })
         };
       });
 
@@ -251,8 +221,8 @@ describe('TranslationService', () => {
       await translationService.translateText(inputText, TranslationDirection.EN_TO_KO);
 
       // then
-      expect(capturedRequestBody.messages[1].content).toBe(inputText);
-      expect(capturedRequestBody.messages[0].content).toContain('preserving markdown');
+      expect(capturedRequestBody.input).toContain(inputText);
+      expect(capturedRequestBody.input).toContain('preserving markdown');
     });
 
     test('throws error when API returns 500 status', async () => {
