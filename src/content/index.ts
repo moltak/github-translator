@@ -90,11 +90,8 @@ if (window.location.hostname === 'github.com') {
         console.log('💡 Set your OpenAI API key in the extension popup to enable real translation');
         currentTitles = getIssueTitles();
         
-        // CommentInterceptor도 비활성화 (API 키 없음)
-        if (commentInterceptor) {
-          commentInterceptor.setEnabled(false);
-        }
-        return;
+        // API 키가 없어도 CommentInterceptor는 실행 (사용자가 영어로 댓글을 작성할 수도 있음)
+        console.log('🔄 API key missing, but proceeding with CommentInterceptor setup...');
       }
 
       console.log('🎯 Sprint 3.5 & 3.6 - Real Translation Starting...');
@@ -122,6 +119,38 @@ if (window.location.hostname === 'github.com') {
       
       if (currentTitles.length === 0) {
         console.log('📭 No titles found to translate');
+        // 제목이 없어도 CommentInterceptor는 계속 실행해야 함
+        console.log('🔄 Title extraction failed, but proceeding with CommentInterceptor setup...');
+      }
+
+      // 🆕 CommentInterceptor 설정 (제목 번역과 독립적으로 실행)
+      if (!commentInterceptor) {
+        commentInterceptor = new CommentInterceptor({
+          enabled: true,
+          debug: true
+        });
+        console.log('📝 CommentInterceptor created with enhanced selectors');
+      }
+      
+      // CommentInterceptor 활성화
+      commentInterceptor.setEnabled(true);
+      commentInterceptor.start();
+      
+      const status = commentInterceptor.getStatus();
+      console.log('📝 CommentInterceptor status:', status);
+      
+      // 디버깅: 현재 페이지에서 댓글 양식이 발견되었는지 확인
+      if (status.interceptedForms === 0) {
+        console.warn('⚠️ No comment forms detected! This may indicate DOM selector issues.');
+        console.log('💡 Current page type:', status.isTranslatableUrl ? 'Translatable' : 'Not translatable');
+        console.log('💡 Run debug-github-comment-forms.js in browser console to analyze DOM structure');
+      } else {
+        console.log(`✅ Successfully monitoring ${status.interceptedForms} comment form(s) for Korean text`);
+      }
+
+      // 제목이 없으면 제목 번역 건너뛰기
+      if (currentTitles.length === 0) {
+        console.log('⏭️ Skipping title translation (no titles found)');
         return;
       }
 
@@ -195,30 +224,7 @@ if (window.location.hostname === 'github.com') {
         console.log('📋 No descriptions found to translate');
       }
 
-      // 🆕 CommentInterceptor 시작 (API 키가 있을 때만)
-      if (!commentInterceptor) {
-        commentInterceptor = new CommentInterceptor({
-          enabled: true,
-          debug: true
-        });
-        console.log('📝 CommentInterceptor created with enhanced selectors');
-      }
-      
-      // CommentInterceptor 활성화
-      commentInterceptor.setEnabled(true);
-      commentInterceptor.start();
-      
-      const status = commentInterceptor.getStatus();
-      console.log('📝 CommentInterceptor status:', status);
-      
-      // 디버깅: 현재 페이지에서 댓글 양식이 발견되었는지 확인
-      if (status.interceptedForms === 0) {
-        console.warn('⚠️ No comment forms detected! This may indicate DOM selector issues.');
-        console.log('💡 Current page type:', status.isTranslatableUrl ? 'Translatable' : 'Not translatable');
-        console.log('💡 Run debug-github-comment-forms.js in browser console to analyze DOM structure');
-      } else {
-        console.log(`✅ Successfully monitoring ${status.interceptedForms} comment form(s) for Korean text`);
-      }
+      // CommentInterceptor는 위에서 이미 설정됨
 
     } catch (error) {
       console.error('❌ Error in extractAndLogTitles:', error);
