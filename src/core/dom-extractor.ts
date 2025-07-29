@@ -547,8 +547,30 @@ export function getIssueTitles(): ExtractedTitle[] {
         
         // 🔍 링크 디버깅 정보 추가
         const isLink = htmlElement.tagName === 'A';
-        const href = isLink ? (htmlElement as HTMLAnchorElement).href : 'N/A';
+        const href = isLink ? (htmlElement as HTMLAnchorElement).href : 'Not a link';
         const classList = htmlElement.className || 'no-class';
+        
+        // 🚫 번역 제외 대상 필터링 (날짜, 메타데이터 등)
+        const excludePatterns = [
+          'dateLink',           // 날짜 링크
+          'date-link',          
+          'timestamp',          // 타임스탬프
+          'time-ago',           // 상대 시간
+          'author-link',        // 작성자 링크  
+          'avatar',             // 아바타
+          'Label--',            // GitHub 라벨
+          'State--',            // 이슈/PR 상태
+          'Counter--',          // 카운터
+        ];
+        
+        const shouldExclude = excludePatterns.some(pattern => 
+          classList.toLowerCase().includes(pattern.toLowerCase())
+        );
+        
+        if (shouldExclude) {
+          console.log(`    ⏭️ Skipped (excluded pattern): "${text.substring(0, 30)}..." (${classList})`);
+          return; // 해당 요소 건너뛰기
+        }
         
         console.log(`  📋 Element ${elemIndex + 1}:`, {
           tagName: htmlElement.tagName,
@@ -559,27 +581,29 @@ export function getIssueTitles(): ExtractedTitle[] {
           element: htmlElement
         });
         
-        // 🔗 중복 링크 체크 (링크인 경우에만)
-        if (isLink && href !== 'N/A') {
-          if (seenLinks.has(href)) {
-            console.log(`    ⏭️ Skipped duplicate link: ${href}`);
-            return;
+        // 텍스트가 있고 이미 추출되지 않은 요소만 처리
+        if (text && text.length > 5) {
+          // 중복 링크 방지 (href 기반)
+          const linkKey = isLink ? href : `non-link-${extractedTitles.length}`;
+          
+          if (!seenLinks.has(linkKey)) {
+            seenLinks.add(linkKey);
+            
+            extractedTitles.push({
+              element: htmlElement,
+              text,
+              selector,
+              index: extractedTitles.length,
+              originalText: text,
+              isReplaced: false,
+            });
+            
+            console.log(`    ✅ Added to extraction list (isLink: ${isLink}, href: ${isLink ? href : 'N/A'})`);
+          } else {
+            console.log(`    ⏭️ Skipped (duplicate link): ${linkKey}`);
           }
-          seenLinks.add(href);
-        }
-        
-        if (text.length > 3) {
-          extractedTitles.push({
-            element: htmlElement,
-            text,
-            selector,
-            index: extractedTitles.length,
-            originalText: text,
-            isReplaced: false
-          });
-          console.log(`    ✅ Added to extraction list (isLink: ${isLink}, href: ${href})`);
         } else {
-          console.log(`    ⏭️ Skipped (text too short: "${text}")`);
+          console.log(`    ⏭️ Skipped (text too short: ${text.length} chars)`);
         }
       });
       

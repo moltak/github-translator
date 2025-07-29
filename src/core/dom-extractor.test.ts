@@ -590,4 +590,93 @@ describe('safeReplaceText - Complex HTML Structure Preservation', () => {
     expect(descriptions[0].text).toContain('detailed bug report');
     expect(descriptions[0].selector).toBe('[class*="MarkdownViewer-module"]');
   });
+
+  test('should exclude date links and metadata from translation', () => {
+    // given - GitHub Issues 페이지에 날짜 링크와 메타데이터 포함
+    mockLocation('/owner/repo/issues');
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <div class="js-navigation-item">
+        <!-- 번역해야 할 이슈 제목 -->
+        <a href="/owner/repo/issues/123" class="IssuePullRequestTitle-module__ListItemTitle_1--_xOfg">
+          Important bug fix needed
+        </a>
+        
+        <!-- 번역하지 않아야 할 날짜 링크 -->
+        <a href="/owner/repo/issues/123" class="IssueBodyHeader-module__dateLink--0HRj6 prc-Link-Link-85e08">
+          opened 2 days ago
+        </a>
+        
+        <!-- 번역하지 않아야 할 기타 메타데이터 -->
+        <span class="Label--primary">bug</span>
+        <span class="State--open">Open</span>
+        <span class="Counter--light">5 comments</span>
+        <a href="/user/author" class="author-link">@author</a>
+      </div>
+      
+      <div class="js-navigation-item">
+        <!-- 또 다른 이슈 제목 -->
+        <a href="/owner/repo/issues/124" class="IssuePullRequestTitle-module__ListItemTitle_1--_xOfg">
+          Another issue title
+        </a>
+        
+        <!-- 또 다른 날짜 링크 -->
+        <span class="timestamp">3 hours ago</span>
+      </div>
+    `;
+    document.body.appendChild(container);
+
+    // when
+    const titles = getIssueTitles();
+
+    // then
+    expect(titles.length).toBe(2); // 이슈 제목 2개만 추출
+    
+    // 이슈 제목들만 포함되어야 함
+    expect(titles[0].text).toBe('Important bug fix needed');
+    expect(titles[1].text).toBe('Another issue title');
+    
+    // 날짜 링크나 메타데이터는 포함되지 않아야 함
+    const allTexts = titles.map(t => t.text);
+    expect(allTexts).not.toContain('opened 2 days ago');
+    expect(allTexts).not.toContain('bug');
+    expect(allTexts).not.toContain('Open');
+    expect(allTexts).not.toContain('5 comments');
+    expect(allTexts).not.toContain('@author');
+    expect(allTexts).not.toContain('3 hours ago');
+  });
+
+  test('should specifically filter out dateLink pattern', () => {
+    // given - 모든 A 태그를 선택하는 상황에서 날짜 링크 필터링 테스트
+    mockLocation('/owner/repo/issues');
+    
+    // 임시로 더 포괄적인 선택자를 사용하도록 DOM 구조 설정
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <div class="js-navigation-item">
+        <a href="/issues/123" class="Link--primary" data-hovercard-type="issue">
+          Valid issue title
+        </a>
+        <a href="/issues/123" class="IssueBodyHeader-module__dateLink--0HRj6">
+          opened 2 days ago  
+        </a>
+        <a href="/user/author" class="author-link-test">
+          @username
+        </a>
+      </div>
+    `;
+    document.body.appendChild(container);
+
+    // when
+    const titles = getIssueTitles();
+
+    // then - 날짜 링크와 작성자 링크는 필터링되어야 함
+    expect(titles.length).toBe(1); // 유효한 이슈 제목 1개만
+    expect(titles[0].text).toBe('Valid issue title');
+    
+    // 날짜 링크는 포함되지 않아야 함
+    const allTexts = titles.map(t => t.text);
+    expect(allTexts).not.toContain('opened 2 days ago');
+    expect(allTexts).not.toContain('@username');
+  });
 });
