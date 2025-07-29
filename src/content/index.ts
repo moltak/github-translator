@@ -350,16 +350,6 @@ if (window.location.hostname === 'github.com') {
     }
   });
 
-  // 테스트용 백그라운드 통신
-  const testBackgroundCommunication = async () => {
-    try {
-      const response = await chrome.runtime.sendMessage({ action: 'demo', message: 'Hello from content script!' });
-      console.log('📧 Background communication test:', response);
-    } catch (error) {
-      console.error('❌ Background communication failed:', error);
-    }
-  };
-
   // 키보드 단축키 처리
   document.addEventListener('keydown', (event) => {
     // Ctrl+Shift+P: 번역 테스트

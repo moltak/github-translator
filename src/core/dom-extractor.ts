@@ -278,8 +278,7 @@ function replaceTextNodesOnly(element: HTMLElement, newText: string): void {
         }
         return NodeFilter.FILTER_REJECT;
       }
-    },
-    false
+    }
   );
 
   let textNode;
@@ -336,7 +335,7 @@ function distributeTranslatedText(textNodes: Text[], sentences: string[]): void 
   // 여러 텍스트 노드가 있는 경우, 문장을 분배
   let sentenceIndex = 0;
   
-  textNodes.forEach((textNode, nodeIndex) => {
+  textNodes.forEach((textNode) => {
     if (sentenceIndex < sentences.length) {
       textNode.textContent = sentences[sentenceIndex];
       sentenceIndex++;
@@ -406,7 +405,7 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
   
   let successCount = 0;
   
-  for (const [index, title] of titles.entries()) {
+  for (const title of titles) {
     try {
       const { element } = title;
       
@@ -438,7 +437,7 @@ export async function replaceTitlesWithTranslation(titles: ExtractedTitle[]): Pr
         console.log(`📨 Received response:`, response);
       } catch (messageError) {
         console.error(`❌ Message sending failed:`, messageError);
-        throw new Error(`Message sending failed: ${messageError.message}`);
+        throw new Error(`Message sending failed: ${messageError instanceof Error ? messageError.message : String(messageError)}`);
       }
       
       if (response && response.success) {
