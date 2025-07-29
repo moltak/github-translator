@@ -201,13 +201,24 @@ if (window.location.hostname === 'github.com') {
           enabled: true,
           debug: true
         });
+        console.log('📝 CommentInterceptor created with enhanced selectors');
       }
       
       // CommentInterceptor 활성화
       commentInterceptor.setEnabled(true);
       commentInterceptor.start();
       
-      console.log('📝 CommentInterceptor status:', commentInterceptor.getStatus());
+      const status = commentInterceptor.getStatus();
+      console.log('📝 CommentInterceptor status:', status);
+      
+      // 디버깅: 현재 페이지에서 댓글 양식이 발견되었는지 확인
+      if (status.interceptedForms === 0) {
+        console.warn('⚠️ No comment forms detected! This may indicate DOM selector issues.');
+        console.log('💡 Current page type:', status.isTranslatableUrl ? 'Translatable' : 'Not translatable');
+        console.log('💡 Run debug-github-comment-forms.js in browser console to analyze DOM structure');
+      } else {
+        console.log(`✅ Successfully monitoring ${status.interceptedForms} comment form(s) for Korean text`);
+      }
 
     } catch (error) {
       console.error('❌ Error in extractAndLogTitles:', error);
