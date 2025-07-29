@@ -124,18 +124,23 @@ export function getTitleSelectors(pageType: GitHubPageInfo['type']): string[] {
  */
 export function findAllPossibleTitles(): ExtractedTitle[] {
   const allSelectors = [
-    // CSS Modules 패턴
+    // 🎯 구체적인 CSS Modules 패턴만 (포괄적 링크 선택자 제거)
     '[class*="IssuePullRequestTitle-module"]',
     '[class*="ListItemTitle"]',
     '[class*="IssueTitle"]',
     '[class*="PullRequestTitle"]',
-    // GitHub 링크 패턴
-    'a[href*="/issues/"]',
-    'a[href*="/pull/"]',
-    // 기존 클래스들
+    
+    // 🎯 구체적인 GitHub 클래스들만
     '.js-issue-title',
-    '.Link--primary',
-    '.js-navigation-item a',
+    '.js-navigation-item [data-hovercard-type="issue"] .Link--primary',
+    '.js-navigation-item .h4 a',
+    '[data-testid="issue-title-link"]',
+    
+    // ❌ 제거된 포괄적 선택자들 (날짜 링크까지 잡아버림)
+    // 'a[href*="/issues/"]',  // 너무 포괄적 - 날짜 링크까지 포함
+    // 'a[href*="/pull/"]',    // 너무 포괄적 - 날짜 링크까지 포함
+    // '.Link--primary',       // 너무 포괄적 - 모든 링크 포함
+    // '.js-navigation-item a', // 너무 포괄적 - 모든 네비게이션 링크 포함
   ];
   
   const foundTitles: ExtractedTitle[] = [];
@@ -145,7 +150,31 @@ export function findAllPossibleTitles(): ExtractedTitle[] {
       const elements = document.querySelectorAll<HTMLElement>(selector);
       elements.forEach((element, index) => {
         const text = element.textContent?.trim() || '';
-        if (text && text.length > 3) { // 의미있는 텍스트만
+        
+        // 🚫 날짜 링크 필터링 추가
+        const classList = element.className || 'no-class';
+        const excludePatterns = [
+          'dateLink',           // 날짜 링크
+          'date-link',          
+          'timestamp',          // 타임스탬프
+          'time-ago',           // 상대 시간
+          'author-link',        // 작성자 링크  
+          'avatar',             // 아바타
+          'Label--',            // GitHub 라벨
+          'State--',            // 이슈/PR 상태
+          'Counter--',          // 카운터
+        ];
+        
+        const shouldExclude = excludePatterns.some(pattern => 
+          classList.toLowerCase().includes(pattern.toLowerCase())
+        );
+        
+        if (shouldExclude) {
+          console.log(`    ⏭️ Comprehensive search: Skipped excluded element: "${text.substring(0, 30)}..." (${classList})`);
+          return;
+        }
+        
+        if (text && text.length > 5) { // 의미있는 텍스트만 (최소 길이 증가)
           foundTitles.push({
             element,
             text,
@@ -618,10 +647,45 @@ export function getIssueTitles(): ExtractedTitle[] {
     // 포괄적 검색 수행
     const allPossibleTitles = findAllPossibleTitles();
     
-    // 🔗 포괄적 검색에서도 중복 제거 적용
+    // 🔗 포괄적 검색에서도 중복 제거 및 날짜 링크 필터링 적용
     allPossibleTitles.forEach(title => {
       const isLink = title.element.tagName === 'A';
       const href = isLink ? (title.element as HTMLAnchorElement).href : 'N/A';
+      const classList = title.element.className || 'no-class';
+      
+      // 🚫 날짜 링크 이중 필터링 (혹시 놓친 것들 추가 차단)
+      const excludePatterns = [
+        'dateLink',           // 날짜 링크
+        'date-link',          
+        'timestamp',          // 타임스탬프
+        'time-ago',           // 상대 시간
+        'author-link',        // 작성자 링크  
+        'avatar',             // 아바타
+        'Label--',            // GitHub 라벨
+        'State--',            // 이슈/PR 상태
+        'Counter--',          // 카운터
+      ];
+      
+      const shouldExclude = excludePatterns.some(pattern => 
+        classList.toLowerCase().includes(pattern.toLowerCase())
+      );
+      
+      // 🚫 날짜 텍스트 패턴도 필터링 추가
+      const dateTextPatterns = [
+        /on\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i,  // "on Jun 24, 2025"
+        /\d{1,2}:\d{2}\s*(AM|PM)/i,                                 // "3:45 PM"
+        /\d+\s+(seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+ago/i, // "2 hours ago"
+        /updated|opened|closed|merged|created/i,                    // 상태 변경 텍스트
+      ];
+      
+      const hasDateText = dateTextPatterns.some(pattern => 
+        pattern.test(title.text)
+      );
+      
+      if (shouldExclude || hasDateText) {
+        console.log(`    ⏭️ Comprehensive search: Skipped excluded/date element: "${title.text.substring(0, 40)}..." (${classList})`);
+        return;
+      }
       
       // 중복 링크 체크
       if (isLink && href !== 'N/A' && seenLinks.has(href)) {

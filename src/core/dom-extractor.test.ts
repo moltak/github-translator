@@ -1,6 +1,6 @@
 // DOM Extractor unit tests
 
-import { detectPageType, getTitleSelectors, getIssueTitles, replaceTitles, restoreTitles, extractAndReplaceTitles, getPRDescription } from './dom-extractor';
+import { detectPageType, getTitleSelectors, getIssueTitles, replaceTitles, restoreTitles, extractAndReplaceTitles, getPRDescription, findAllPossibleTitles } from './dom-extractor';
 
 // Mock window.location
 const mockLocation = (pathname: string, href?: string) => {
@@ -755,6 +755,60 @@ describe('safeReplaceText - Complex HTML Structure Preservation', () => {
       // when & then - 쿼리 파라미터나 프래그먼트가 있는 경우
       expect(isTranslatableURL('https://github.com/owner/repo/issues/123#comment-456')).toBe(true);
       expect(isTranslatableURL('https://github.com/owner/repo/issues/123?tab=commits')).toBe(true);
+    });
+
+    test('should filter out date links and date text in comprehensive search', () => {
+      // given - comprehensive search가 실행되는 상황 (일반 선택자로 찾지 못할 때)
+      mockLocation('/owner/repo/issues/123');
+      
+      // findAllPossibleTitles 함수 시뮬레이션을 위한 DOM 구조
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <!-- 번역해야 할 실제 이슈 제목 -->
+        <div class="IssuePullRequestTitle-module__something">
+          Real issue title
+        </div>
+        
+        <!-- 번역하지 않아야 할 날짜 링크들 -->
+        <a href="#issue-123" class="IssueBodyHeader-module__dateLink--0HRj6">
+          on Jun 24, 2025
+        </a>
+        
+        <a href="#comment-456" class="some-timestamp-class">
+          on Jun 30, 2025
+        </a>
+        
+        <span class="timestamp">
+          3 hours ago
+        </span>
+        
+        <!-- 번역하지 않아야 할 상태 텍스트 -->
+        <span>opened this issue</span>
+        <span>closed 2 days ago</span>
+      `;
+      document.body.appendChild(container);
+
+      // when - findAllPossibleTitles 실행
+      const foundTitles = findAllPossibleTitles();
+
+      // then - 날짜 관련 요소들은 필터링되어야 함
+      const allTexts = foundTitles.map(t => t.text);
+      
+      // 실제 이슈 제목은 포함되어야 함
+      expect(allTexts).toContain('Real issue title');
+      
+      // 날짜 관련 텍스트들은 포함되지 않아야 함
+      expect(allTexts).not.toContain('on Jun 24, 2025');
+      expect(allTexts).not.toContain('on Jun 30, 2025');
+      expect(allTexts).not.toContain('3 hours ago');
+      expect(allTexts).not.toContain('opened this issue');
+      expect(allTexts).not.toContain('closed 2 days ago');
+      
+      // 날짜 링크가 제대로 필터링되었는지 확인
+      expect(foundTitles.every(title => {
+        const classList = title.element.className || '';
+        return !classList.includes('dateLink') && !classList.includes('timestamp');
+      })).toBe(true);
     });
   });
 });
