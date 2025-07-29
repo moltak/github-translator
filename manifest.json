@@ -3,15 +3,8 @@
   "name": "GitHub Translator",
   "version": "1.0.0",
   "description": "Translate GitHub Issues and Pull Requests between Korean and English",
-  "permissions": [
-    "storage",
-    "scripting",
-    "activeTab"
-  ],
-  "host_permissions": [
-    "https://api.openai.com/*",
-    "https://github.com/*"
-  ],
+  "permissions": ["storage", "scripting", "activeTab"],
+  "host_permissions": ["https://api.openai.com/*", "https://github.com/*"],
   "background": {
     "service_worker": "background.js"
   },
@@ -19,7 +12,6 @@
     {
       "matches": ["https://github.com/*"],
       "js": ["content.js"],
-      "type": "module",
       "run_at": "document_idle"
     }
   ],
