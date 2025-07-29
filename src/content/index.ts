@@ -2,6 +2,7 @@
 
 import { getIssueTitles, getPRDescription, safeReplaceText, restoreOriginalText, detectPageType } from '../core/dom-extractor';
 import { CommentInterceptor } from '../core/comment-interceptor';
+import { CommentTranslateButton } from '../core/comment-translate-button';
 
 console.log('🚀 Hello GitHub Translator - Content Script Loaded!');
 
@@ -9,8 +10,11 @@ console.log('🚀 Hello GitHub Translator - Content Script Loaded!');
 let isTranslatorEnabled = true;
 let currentTitles: any[] = [];
 
-// 🆕 CommentInterceptor 인스턴스
+// 🆕 CommentInterceptor 인스턴스 (기존 방식)
 let commentInterceptor: CommentInterceptor | null = null;
+
+// 🆕 CommentTranslateButton 인스턴스 (새로운 방식)
+let commentTranslateButton: CommentTranslateButton | null = null;
 
 /**
  * URL이 번역 대상인지 확인하는 함수
@@ -123,29 +127,37 @@ if (window.location.hostname === 'github.com') {
         console.log('🔄 Title extraction failed, but proceeding with CommentInterceptor setup...');
       }
 
-      // 🆕 CommentInterceptor 설정 (제목 번역과 독립적으로 실행)
-      if (!commentInterceptor) {
-        commentInterceptor = new CommentInterceptor({
+      // 🆕 CommentTranslateButton 설정 (새로운 방식 - 번역 버튼 추가)
+      if (!commentTranslateButton) {
+        commentTranslateButton = new CommentTranslateButton({
           enabled: true,
           debug: true
         });
-        console.log('📝 CommentInterceptor created with enhanced selectors');
+        console.log('🌐 CommentTranslateButton created - adding translate buttons to comment areas');
       }
       
-      // CommentInterceptor 활성화
-      commentInterceptor.setEnabled(true);
-      commentInterceptor.start();
+      // CommentTranslateButton 활성화
+      commentTranslateButton.setEnabled(true);
+      commentTranslateButton.start();
       
-      const status = commentInterceptor.getStatus();
-      console.log('📝 CommentInterceptor status:', status);
+      const translateButtonStatus = commentTranslateButton.getStatus();
+      console.log('🌐 CommentTranslateButton status:', translateButtonStatus);
       
-      // 디버깅: 현재 페이지에서 댓글 양식이 발견되었는지 확인
-      if (status.interceptedForms === 0) {
-        console.warn('⚠️ No comment forms detected! This may indicate DOM selector issues.');
-        console.log('💡 Current page type:', status.isTranslatableUrl ? 'Translatable' : 'Not translatable');
-        console.log('💡 Run debug-github-comment-forms.js in browser console to analyze DOM structure');
+      // 번역 버튼 추가 상태 확인
+      if (translateButtonStatus.componentsCount === 0) {
+        console.log('💡 No comment areas found yet. Buttons will be added automatically when comment areas appear.');
+        console.log('💡 Current page type:', translateButtonStatus.isTranslatableUrl ? 'Translatable' : 'Not translatable');
       } else {
-        console.log(`✅ Successfully monitoring ${status.interceptedForms} comment form(s) for Korean text`);
+        console.log(`✅ Successfully added translate buttons to ${translateButtonStatus.componentsCount} comment area(s)`);
+      }
+
+      // 🆕 기존 CommentInterceptor도 유지 (호환성을 위해)
+      if (!commentInterceptor) {
+        commentInterceptor = new CommentInterceptor({
+          enabled: false, // 기본적으로 비활성화
+          debug: true
+        });
+        console.log('📝 CommentInterceptor created (fallback mode)');
       }
 
       // 제목이 없으면 제목 번역 건너뛰기
@@ -342,6 +354,9 @@ if (window.location.hostname === 'github.com') {
     if (commentInterceptor) {
       commentInterceptor.stop();
     }
+    if (commentTranslateButton) {
+      commentTranslateButton.stop();
+    }
   });
 
   // Extension 상태 변경 감지
@@ -355,6 +370,9 @@ if (window.location.hostname === 'github.com') {
         restoreOriginalTitles();
         if (commentInterceptor) {
           commentInterceptor.setEnabled(false);
+        }
+        if (commentTranslateButton) {
+          commentTranslateButton.setEnabled(false);
         }
       } else {
         // 활성화되면 다시 번역 (URL 체크 포함)
@@ -402,7 +420,7 @@ if (window.location.hostname === 'github.com') {
       }
     }
     
-    // 🆕 Ctrl+Shift+C: CommentInterceptor 토글
+    // 🆕 Ctrl+Shift+C: CommentTranslateButton 토글
     if (event.ctrlKey && event.shiftKey && event.key === 'C') {
       event.preventDefault();
       
@@ -412,17 +430,17 @@ if (window.location.hostname === 'github.com') {
         return;
       }
       
-      if (commentInterceptor) {
-        if (commentInterceptor.isEnabled()) {
-          commentInterceptor.setEnabled(false);
-          console.log('📝 CommentInterceptor disabled via Ctrl+Shift+C');
+      if (commentTranslateButton) {
+        if (commentTranslateButton.isEnabled()) {
+          commentTranslateButton.setEnabled(false);
+          console.log('🌐 CommentTranslateButton disabled via Ctrl+Shift+C');
         } else {
-          commentInterceptor.setEnabled(true);
-          console.log('📝 CommentInterceptor enabled via Ctrl+Shift+C');
+          commentTranslateButton.setEnabled(true);
+          console.log('🌐 CommentTranslateButton enabled via Ctrl+Shift+C');
         }
-        console.log('📝 CommentInterceptor status:', commentInterceptor.getStatus());
+        console.log('🌐 CommentTranslateButton status:', commentTranslateButton.getStatus());
       } else {
-        console.log('❌ CommentInterceptor not initialized');
+        console.log('❌ CommentTranslateButton not initialized');
       }
     }
   });
@@ -430,7 +448,7 @@ if (window.location.hostname === 'github.com') {
   console.log('📚 GitHub Translator loaded! Available shortcuts:');
   console.log('   🔥 Ctrl+Shift+P: Force translate titles');
   console.log('   🔄 Ctrl+Shift+T: Toggle translation (restore ↔ translate)');
-  console.log('   📝 Ctrl+Shift+C: Toggle CommentInterceptor (한국어 댓글 → 영어 번역)');
+  console.log('   🌐 Ctrl+Shift+C: Toggle CommentTranslateButton (번역 버튼 표시/숨김)');
 } else {
   console.log('❌ Not running on GitHub.com');
 }
