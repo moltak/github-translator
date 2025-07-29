@@ -1,6 +1,6 @@
 // Content Script for GitHub Translator Extension
 
-import { getIssueTitles, getPRDescription, safeReplaceText, restoreOriginalText, detectPageType, ExtractedTitle } from '../core/dom-extractor';
+import { getIssueTitles, getPRDescription, safeReplaceText, restoreOriginalText, detectPageType } from '../core/dom-extractor';
 import { CommentInterceptor } from '../core/comment-interceptor';
 
 console.log('🚀 Hello GitHub Translator - Content Script Loaded!');
@@ -150,7 +150,7 @@ if (window.location.hostname === 'github.com') {
           }
         } catch (error) {
           console.error('❌ Translation request failed for:', title.text, error);
-          return { success: false, original: title.text, error: error.message };
+          return { success: false, original: title.text, error: error instanceof Error ? error.message : String(error) };
         }
       });
 
