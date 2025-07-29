@@ -1,12 +1,16 @@
 // Content Script for GitHub Translator Extension
 
-import { getIssueTitles, detectPageType, waitForDOM, extractAndReplaceTitles, extractAndTranslateTitles, restoreTitles, getPRDescription, extractAndTranslatePRDescription } from '../core/dom-extractor';
+import { getIssueTitles, getPRDescription, safeReplaceText, restoreOriginalText, detectPageType, ExtractedTitle } from '../core/dom-extractor';
+import { CommentInterceptor } from '../core/comment-interceptor';
 
 console.log('🚀 Hello GitHub Translator - Content Script Loaded!');
 
 // Extension 상태 추적
 let isTranslatorEnabled = true;
 let currentTitles: any[] = [];
+
+// 🆕 CommentInterceptor 인스턴스
+let commentInterceptor: CommentInterceptor | null = null;
 
 /**
  * URL이 번역 대상인지 확인하는 함수
@@ -44,6 +48,11 @@ if (window.location.hostname === 'github.com') {
         console.log('   - /issues/123 (specific issue)'); 
         console.log('   - /pull/123 (specific pull request)');
         console.log('   - /pulls (pull requests list)');
+        
+        // CommentInterceptor도 비활성화
+        if (commentInterceptor) {
+          commentInterceptor.stop();
+        }
         return;
       }
       
@@ -64,101 +73,172 @@ if (window.location.hostname === 'github.com') {
         console.log('⏸️ Translator disabled - only extracting titles');
         // 비활성화 상태에서는 제목만 추출
         currentTitles = getIssueTitles();
+        
+        // CommentInterceptor도 비활성화
+        if (commentInterceptor) {
+          commentInterceptor.setEnabled(false);
+        }
         return;
       }
       
       // Check if API key is available for real translation
       const storage = await chrome.storage.sync.get(['openaiApiKey']);
       const hasApiKey = !!storage.openaiApiKey;
+
+      if (!hasApiKey) {
+        console.log('🔑 No API key found - extracting titles without translation');
+        console.log('💡 Set your OpenAI API key in the extension popup to enable real translation');
+        currentTitles = getIssueTitles();
+        
+        // CommentInterceptor도 비활성화 (API 키 없음)
+        if (commentInterceptor) {
+          commentInterceptor.setEnabled(false);
+        }
+        return;
+      }
+
+      console.log('🎯 Sprint 3.5 & 3.6 - Real Translation Starting...');
+      console.log('🎯 Sprint 3.5 - Real Translation Starting...');
       
-      console.log('🔍 API Key Debug:', { 
-        storage, 
-        hasApiKey, 
-        apiKeyExists: !!storage.openaiApiKey,
-        apiKeyLength: storage.openaiApiKey ? storage.openaiApiKey.length : 0,
-        apiKeyPrefix: storage.openaiApiKey ? storage.openaiApiKey.substring(0, 8) + '...' : 'none'
-      });
+      // 제목 추출
+      currentTitles = getIssueTitles();
       
-      if (hasApiKey) {
-        console.log('🎯 Sprint 3.5 & 3.6 - Real Translation Starting...');
+      console.log(`📄 Found ${currentTitles.length} titles on ${pageInfo.type} page`);
+      
+      const linkCount = currentTitles.filter(title => title.isLink).length;
+      const nonLinkCount = currentTitles.length - linkCount;
+      console.log(`🔗 Link analysis: ${linkCount} links, ${nonLinkCount} non-links`);
+      
+      if (linkCount > 0) {
+        console.log('🔗 Unique links found:', linkCount);
+        console.log('🔗 Links found:');
+        currentTitles
+          .filter(title => title.isLink)
+          .forEach((title, index) => {
+            const displayText = title.text.length > 30 ? title.text.substring(0, 30) + '...' : title.text;
+            console.log(`${index + 1}. "${displayText}" → ${title.element.href}`);
+          });
+      }
+      
+      if (currentTitles.length === 0) {
+        console.log('📭 No titles found to translate');
+        return;
+      }
+
+      // 실제 번역 요청
+      console.log('🌐 Starting real translation for', currentTitles.length, 'titles...');
+      
+      const translationPromises = currentTitles.map(async (title) => {
         try {
-          // 제목 번역
-          currentTitles = await extractAndTranslateTitles();
+          console.log('📡 Sending translation request for:', `"${title.text.substring(0, 30)}${title.text.length > 30 ? ' ...' : ''}"`);
           
-          // PR/Issue 페이지인 경우 설명도 번역
-          if (pageInfo.type === 'pull_request' || pageInfo.type === 'issue') {
-            console.log('📝 Also translating PR/Issue description...');
-            const descriptionCount = await extractAndTranslatePRDescription();
-            console.log(`📋 Translated ${descriptionCount} description(s)`);
+          const response = await chrome.runtime.sendMessage({
+            type: 'TRANSLATE',
+            text: title.text,
+            direction: 'EN_TO_KO'
+          });
+          
+          console.log('📨 Received response:', response);
+          
+          if (response.success) {
+            // 번역된 텍스트로 DOM 교체 (HTML 구조 보존)
+            safeReplaceText(title.element, response.translatedText);
+            return { success: true, original: title.text, translated: response.translatedText };
+          } else {
+            console.error('❌ Translation failed for:', title.text, response.error);
+            return { success: false, original: title.text, error: response.error };
           }
         } catch (error) {
-          console.error('❌ Real translation failed, falling back to demo mode:', error);
-          currentTitles = extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
+          console.error('❌ Translation request failed for:', title.text, error);
+          return { success: false, original: title.text, error: error.message };
         }
+      });
+
+      const results = await Promise.all(translationPromises);
+      const successCount = results.filter(r => r.success).length;
+      
+      console.log(`🎉 Real translation completed: ${successCount}/${currentTitles.length} titles translated`);
+      console.log('🎉 Sprint 3.5 Complete: Extracted and translated', `${successCount}/${currentTitles.length}`, 'titles!');
+
+      // Sprint 3.6: PR Description Translation
+      console.log('📝 Also translating PR/Issue description...');
+      const descriptions = getPRDescription();
+      
+      if (descriptions.length > 0) {
+        console.log(`📋 Found ${descriptions.length} description(s) to translate`);
+        
+        const descriptionPromises = descriptions.map(async (desc) => {
+          try {
+            const response = await chrome.runtime.sendMessage({
+              type: 'TRANSLATE',
+              text: desc.text,
+              direction: 'EN_TO_KO'
+            });
+            
+            if (response.success) {
+              safeReplaceText(desc.element, response.translatedText);
+              return true;
+            }
+            return false;
+          } catch (error) {
+            console.error('❌ Description translation failed:', error);
+            return false;
+          }
+        });
+        
+        const descResults = await Promise.all(descriptionPromises);
+        const descSuccessCount = descResults.filter(r => r).length;
+        
+        console.log(`📋 Translated ${descSuccessCount} description(s)`);
+        console.log('🎉 Sprint 3.6 Complete: Translated', `${descSuccessCount}/${descriptions.length}`, 'PR description(s)!');
       } else {
-        console.log('🎯 Sprint 2.3 - Demo Mode (No API Key) - Using Placeholder...');
-        currentTitles = extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
+        console.log('📋 No descriptions found to translate');
+      }
+
+      // 🆕 CommentInterceptor 시작 (API 키가 있을 때만)
+      if (!commentInterceptor) {
+        commentInterceptor = new CommentInterceptor({
+          enabled: true,
+          debug: true
+        });
       }
       
-      if (currentTitles.length > 0) {
-        console.log(`🎉 Processed ${currentTitles.length} GitHub titles successfully`);
-      } else {
-        console.log('📭 No titles found on this page');
-      }
+      // CommentInterceptor 활성화
+      commentInterceptor.setEnabled(true);
+      commentInterceptor.start();
       
+      console.log('📝 CommentInterceptor status:', commentInterceptor.getStatus());
+
     } catch (error) {
-      console.error('❌ Error extracting/replacing titles:', error);
+      console.error('❌ Error in extractAndLogTitles:', error);
     }
   };
   
-  // 제목 복원 함수
-  const restoreOriginalTitles = () => {
-    if (currentTitles.length > 0) {
-      console.log('🔄 Restoring original titles...');
-      const restoredCount = restoreTitles();
-      console.log(`✅ Restored ${restoredCount} titles to original text`);
-    }
-  };
-  
-  // Sprint 3.6: PR 설명 감지 테스트
-  const testPRDescriptionDetection = () => {
-    console.log('🔍 Testing PR description detection...');
-    const descriptions = getPRDescription();
-    console.log(`📋 Found ${descriptions.length} PR description(s):`);
-    descriptions.forEach((desc, index) => {
-      console.log(`  ${index + 1}. "${desc.text.substring(0, 100)}..." (${desc.selector})`);
+  // DOM 로딩 대기 함수
+  const waitForDOM = (): Promise<void> => {
+    return new Promise((resolve) => {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => resolve());
+      } else {
+        resolve();
+      }
     });
   };
 
-  // Demo: Background Script와 통신 테스트
-  const testBackgroundCommunication = async () => {
-    try {
-      const response = await chrome.runtime.sendMessage({ 
-        action: 'demo', 
-        pageType: detectPageType().type 
+  // 원본 제목 복원 함수
+  const restoreOriginalTitles = () => {
+    if (currentTitles.length > 0) {
+      console.log('🔄 Restoring original titles...');
+      currentTitles.forEach(title => {
+        restoreOriginalText(title.element);
       });
-      console.log('✅ Background communication successful:', response);
-    } catch (error) {
-      console.error('❌ Background communication failed:', error);
+      currentTitles = [];
     }
   };
-  
-  // 페이지 로드 후 실행
-  const initializeExtension = async () => {
-    await testBackgroundCommunication();
-    
-    // Sprint 2.1, 2.3: 제목 추출 및 교체 실행
-    setTimeout(async () => {
-      await extractAndLogTitles();
-    }, 2000); // GitHub의 동적 로딩을 위해 2초 대기 (CSS Modules 로딩 시간 고려)
-  };
-  
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeExtension);
-  } else {
-    initializeExtension();
-  }
-  
+
+  // 초기 실행
+  extractAndLogTitles();
+
   // Sprint 2.2: 향상된 MutationObserver for Live Detection
   let currentUrl = window.location.href;
   let observerTimeout: NodeJS.Timeout | null = null;
@@ -172,6 +252,11 @@ if (window.location.hostname === 'github.com') {
       // 이전 제목들 복원
       restoreOriginalTitles();
       
+      // CommentInterceptor 중지 후 재시작
+      if (commentInterceptor) {
+        commentInterceptor.stop();
+      }
+      
       // 디바운스된 재실행
       if (observerTimeout) {
         clearTimeout(observerTimeout);
@@ -180,7 +265,6 @@ if (window.location.hostname === 'github.com') {
       observerTimeout = setTimeout(async () => {
         console.log('🔄 Re-running extraction after navigation...');
         await extractAndLogTitles();
-        testBackgroundCommunication();
       }, 2000); // 네비게이션 후 2초 대기
       
       return;
@@ -215,131 +299,131 @@ if (window.location.hostname === 'github.com') {
       }
     });
     
-    // 관련 변화가 있을 때만 재실행
-    if (hasRelevantChanges && isTranslatorEnabled) {
-      // 디바운스된 재실행
+    // 관련 변화가 있으면 디바운스된 재실행
+    if (hasRelevantChanges) {
       if (observerTimeout) {
         clearTimeout(observerTimeout);
       }
       
       observerTimeout = setTimeout(async () => {
-        // 🎯 URL 체크 추가 - issues/pull 페이지에서만 재실행
-        if (!isTranslatableURL(window.location.href)) {
-          console.log('⏭️ Skipping re-extraction - URL changed to non-translatable page');
-          return;
-        }
-        
         console.log('🔄 Re-running extraction due to DOM changes...');
         await extractAndLogTitles();
       }, 1000); // DOM 변화 후 1초 대기
     }
   });
   
-  // 향상된 관찰 설정
+  // 관찰 시작
   observer.observe(document.body, {
     childList: true,
     subtree: true,
-    attributes: false, // 속성 변화는 관찰하지 않음 (성능 최적화)
-    characterData: false, // 텍스트 변화는 관찰하지 않음
+    attributes: false
   });
-  
-  // 설정 변경 감지
-  chrome.storage.onChanged.addListener((changes) => {
-    if (changes.translatorEnabled) {
-      const newValue = changes.translatorEnabled.newValue !== false;
+
+  // 페이지 종료 시 정리
+  window.addEventListener('beforeunload', () => {
+    restoreOriginalTitles();
+    if (commentInterceptor) {
+      commentInterceptor.stop();
+    }
+  });
+
+  // Extension 상태 변경 감지
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'sync' && changes.translatorEnabled) {
+      const newEnabled = changes.translatorEnabled.newValue;
+      console.log('🔧 Extension enabled state changed:', newEnabled);
       
-      if (newValue !== isTranslatorEnabled) {
-        isTranslatorEnabled = newValue;
-        console.log(`🔧 Translator ${isTranslatorEnabled ? 'enabled' : 'disabled'}`);
-        
-        if (isTranslatorEnabled) {
-          // 활성화 시 제목 교체 실행
-          setTimeout(async () => {
-            // 🎯 URL 체크 추가 - issues/pull 페이지에서만 실행
-            if (!isTranslatableURL(window.location.href)) {
-              console.log('⏭️ Skipping translation on enable - not on issues/pull page');
-              return;
-            }
-            
-            await extractAndLogTitles();
-          }, 500);
-        } else {
-          // 비활성화 시 원본 제목 복원
-          restoreOriginalTitles();
+      if (!newEnabled) {
+        // 비활성화되면 원본 복원
+        restoreOriginalTitles();
+        if (commentInterceptor) {
+          commentInterceptor.setEnabled(false);
+        }
+      } else {
+        // 활성화되면 다시 번역 (URL 체크 포함)
+        if (isTranslatableURL(window.location.href)) {
+          extractAndLogTitles();
         }
       }
+      
+      isTranslatorEnabled = newEnabled;
     }
   });
-  
-  // 정리 함수
-  window.addEventListener('beforeunload', () => {
-    if (observerTimeout) {
-      clearTimeout(observerTimeout);
+
+  // 테스트용 백그라운드 통신
+  const testBackgroundCommunication = async () => {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'demo', message: 'Hello from content script!' });
+      console.log('📧 Background communication test:', response);
+    } catch (error) {
+      console.error('❌ Background communication failed:', error);
     }
-    observer.disconnect();
-    restoreOriginalTitles(); // 페이지 종료 시 원본 복원
-  });
-  
-  // 키보드 단축키로 토글 (개발용)
+  };
+
+  // 키보드 단축키 처리
   document.addEventListener('keydown', (event) => {
-    // Ctrl + Shift + P로 PR 설명 감지 테스트
+    // Ctrl+Shift+P: 번역 테스트
     if (event.ctrlKey && event.shiftKey && event.key === 'P') {
       event.preventDefault();
       
-      // 🎯 URL 체크 추가 - issues/pull 페이지에서만 테스트 가능
+      // URL 필터링 체크
       if (!isTranslatableURL(window.location.href)) {
-        console.log('⏭️ PR description test disabled - not on issues/pull page');
+        console.log('⏭️ Keyboard shortcut: Skipping - URL not translatable');
         return;
       }
       
-      testPRDescriptionDetection();
-      return;
+      console.log('🔥 Manual translation triggered via Ctrl+Shift+P');
+      extractAndLogTitles();
     }
     
-    // Ctrl + Shift + T로 제목 토글
+    // Ctrl+Shift+T: 토글 (원본 복원 ↔ 번역)
     if (event.ctrlKey && event.shiftKey && event.key === 'T') {
       event.preventDefault();
       
-      // 🎯 URL 체크 추가 - issues/pull 페이지에서만 토글 가능
+      // URL 필터링 체크
       if (!isTranslatableURL(window.location.href)) {
-        console.log('⏭️ Keyboard shortcut disabled - not on issues/pull page');
-        console.log('📋 Translation shortcuts only work on:');
-        console.log('   - /issues (issues list)');
-        console.log('   - /issues/123 (specific issue)'); 
-        console.log('   - /pull/123 (specific pull request)');
-        console.log('   - /pulls (pull requests list)');
+        console.log('⏭️ Keyboard shortcut: Skipping - URL not translatable');
         return;
       }
       
       if (currentTitles.length > 0) {
-        const hasReplacedTitles = document.querySelector('[data-github-translator="replaced"]');
-        
-        if (hasReplacedTitles) {
-          restoreOriginalTitles();
-          console.log('🔄 Restored titles via keyboard shortcut');
+        console.log('🔄 Manual restore triggered via Ctrl+Shift+T');
+        restoreOriginalTitles();
+      } else {
+        console.log('🔥 Manual translation triggered via Ctrl+Shift+T');
+        extractAndLogTitles();
+      }
+    }
+    
+    // 🆕 Ctrl+Shift+C: CommentInterceptor 토글
+    if (event.ctrlKey && event.shiftKey && event.key === 'C') {
+      event.preventDefault();
+      
+      // URL 필터링 체크
+      if (!isTranslatableURL(window.location.href)) {
+        console.log('⏭️ Keyboard shortcut: Skipping - URL not translatable');
+        return;
+      }
+      
+      if (commentInterceptor) {
+        if (commentInterceptor.isEnabled()) {
+          commentInterceptor.setEnabled(false);
+          console.log('📝 CommentInterceptor disabled via Ctrl+Shift+C');
         } else {
-          // Check if API key is available for real translation
-          chrome.storage.sync.get(['openaiApiKey']).then(async (storage) => {
-            const hasApiKey = !!storage.openaiApiKey;
-            
-            if (hasApiKey) {
-              try {
-                await extractAndTranslateTitles();
-                console.log('🔄 Translated titles via keyboard shortcut');
-              } catch (error) {
-                console.error('❌ Translation failed via shortcut, using demo mode:', error);
-                extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
-              }
-            } else {
-              extractAndReplaceTitles('HELLO GITHUB TRANSLATOR');
-              console.log('🔄 Replaced titles via keyboard shortcut (Demo Mode)');
-            }
-          });
+          commentInterceptor.setEnabled(true);
+          console.log('📝 CommentInterceptor enabled via Ctrl+Shift+C');
         }
+        console.log('📝 CommentInterceptor status:', commentInterceptor.getStatus());
+      } else {
+        console.log('❌ CommentInterceptor not initialized');
       }
     }
   });
-  
+
+  console.log('📚 GitHub Translator loaded! Available shortcuts:');
+  console.log('   🔥 Ctrl+Shift+P: Force translate titles');
+  console.log('   🔄 Ctrl+Shift+T: Toggle translation (restore ↔ translate)');
+  console.log('   📝 Ctrl+Shift+C: Toggle CommentInterceptor (한국어 댓글 → 영어 번역)');
 } else {
   console.log('❌ Not running on GitHub.com');
 }

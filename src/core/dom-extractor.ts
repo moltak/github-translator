@@ -197,7 +197,12 @@ export function findAllPossibleTitles(): ExtractedTitle[] {
  * 요소의 텍스트만 안전하게 교체합니다 (HTML 구조 완전 보존)
  * 복잡한 마크다운 렌더링 구조도 안전하게 처리합니다.
  */
-function safeReplaceText(element: HTMLElement, newText: string): void {
+export function safeReplaceText(element: HTMLElement, newText: string): void {
+  // 원본 텍스트를 data attribute에 저장 (복원용)
+  if (!element.getAttribute('data-github-translator-original')) {
+    element.setAttribute('data-github-translator-original', element.textContent || '');
+  }
+  
   // 간단한 요소 (제목 등): 직접 텍스트 교체
   if (isSimpleTextElement(element)) {
     if (element.tagName === 'A') {
@@ -215,6 +220,34 @@ function safeReplaceText(element: HTMLElement, newText: string): void {
 
   // 복잡한 구조 (PR 설명 등): 텍스트 노드만 안전하게 교체
   replaceTextNodesOnly(element, newText);
+}
+
+/**
+ * 요소의 텍스트를 원본으로 복원합니다
+ */
+export function restoreOriginalText(element: HTMLElement): void {
+  const originalText = element.getAttribute('data-github-translator-original');
+  if (originalText) {
+    // 간단한 요소 (제목 등): 직접 텍스트 복원
+    if (isSimpleTextElement(element)) {
+      if (element.tagName === 'A') {
+        // <a> 태그인 경우 href 속성 보존
+        const originalHref = (element as HTMLAnchorElement).href;
+        element.textContent = originalText;
+        if (originalHref && (element as HTMLAnchorElement).href !== originalHref) {
+          (element as HTMLAnchorElement).href = originalHref;
+        }
+      } else {
+        element.textContent = originalText;
+      }
+    } else {
+      // 복잡한 구조: 텍스트 노드만 복원
+      replaceTextNodesOnly(element, originalText);
+    }
+    
+    // 복원 후 data attribute 제거
+    element.removeAttribute('data-github-translator-original');
+  }
 }
 
 /**
