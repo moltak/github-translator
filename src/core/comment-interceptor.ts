@@ -130,49 +130,109 @@ export class CommentInterceptor {
     return components;
   }
 
-  /**
-   * 컨테이너 내부의 댓글 제출 버튼들을 찾는 함수
-   */
-  private findCommentButtons(container: Element): HTMLElement[] {
-    const buttons: HTMLElement[] = [];
-    
-    // 모든 버튼과 클릭 가능한 요소들 검색
-    const allButtons = container.querySelectorAll('button, [role="button"], [type="submit"]');
-    
-    allButtons.forEach(button => {
-      const text = button.textContent?.toLowerCase() || '';
-      const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
-      const className = button.className?.toLowerCase() || '';
-      
-      // 댓글 제출 버튼인지 판별
-      if (
-        text.includes('comment') || 
-        text.includes('submit') ||
-        text.includes('reply') ||
-        text.includes('post') ||
-        ariaLabel.includes('comment') ||
-        ariaLabel.includes('submit') ||
-        className.includes('submit') ||
-        className.includes('comment')
-      ) {
-        buttons.push(button as HTMLElement);
-      }
-    });
-    
-    // 명시적인 submit 버튼이 없으면 모든 버튼 중에서 찾기
-    if (buttons.length === 0) {
-      const fallbackButtons = container.querySelectorAll('button[type="submit"], button:not([type])');
-      fallbackButtons.forEach(btn => {
-        // 숨겨진 버튼이나 disabled 버튼은 제외
-        const element = btn as HTMLElement;
-        if (element.offsetWidth > 0 && element.offsetHeight > 0 && !element.disabled) {
-          buttons.push(element);
-        }
-      });
-    }
-    
-    return buttons;
-  }
+     /**
+    * 컨테이너 내부의 댓글 제출 버튼들을 찾는 함수 (GitHub 2024 UI 최적화)
+    */
+   private findCommentButtons(container: Element): HTMLElement[] {
+     const buttons: HTMLElement[] = [];
+     
+     if (this.options.debug) {
+       console.log('🔍 Finding comment buttons in container:', container.className);
+     }
+     
+     // 모든 버튼과 클릭 가능한 요소들 검색
+     const allButtons = container.querySelectorAll('button, [role="button"], [type="submit"]');
+     
+     if (this.options.debug) {
+       console.log(`🔍 Found ${allButtons.length} total buttons/clickable elements`);
+     }
+     
+     allButtons.forEach((button, index) => {
+       const element = button as HTMLElement;
+       const text = element.textContent?.toLowerCase() || '';
+       const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || '';
+       const className = element.className?.toLowerCase() || '';
+       const type = element.getAttribute('type')?.toLowerCase() || '';
+       
+       if (this.options.debug) {
+         console.log(`🔍 Button ${index + 1}:`, {
+           text: text.substring(0, 30),
+           ariaLabel: ariaLabel,
+           className: className.substring(0, 50),
+           type: type,
+           visible: element.offsetWidth > 0 && element.offsetHeight > 0,
+           disabled: element.disabled
+         });
+       }
+       
+       // 더 포괄적인 댓글 제출 버튼 감지
+       const isCommentButton = (
+         // 텍스트 기반 감지
+         text.includes('comment') || 
+         text.includes('submit') ||
+         text.includes('reply') ||
+         text.includes('post') ||
+         text.includes('send') ||
+         text.includes('add') ||
+         
+         // Aria label 기반 감지
+         ariaLabel.includes('comment') ||
+         ariaLabel.includes('submit') ||
+         ariaLabel.includes('reply') ||
+         ariaLabel.includes('post') ||
+         ariaLabel.includes('send') ||
+         
+         // CSS 클래스 기반 감지
+         className.includes('submit') ||
+         className.includes('comment') ||
+         className.includes('primary') ||
+         
+         // Type 기반 감지
+         type === 'submit'
+       );
+       
+       // 버튼이 보이고 활성화되어 있으면 추가
+       if (isCommentButton && element.offsetWidth > 0 && element.offsetHeight > 0 && !element.disabled) {
+         buttons.push(element);
+         
+         if (this.options.debug) {
+           console.log(`✅ Selected as comment button ${buttons.length}:`, {
+             text: text.substring(0, 30),
+             reason: isCommentButton ? 'matched criteria' : 'fallback'
+           });
+         }
+       }
+     });
+     
+     // 명시적인 submit 버튼이 없으면 더 관대한 fallback
+     if (buttons.length === 0) {
+       if (this.options.debug) {
+         console.log('🔍 No specific comment buttons found, using fallback approach...');
+       }
+       
+       const fallbackButtons = container.querySelectorAll('button:not([disabled])');
+       fallbackButtons.forEach((btn, index) => {
+         const element = btn as HTMLElement;
+         // 보이는 버튼만 추가
+         if (element.offsetWidth > 0 && element.offsetHeight > 0) {
+           buttons.push(element);
+           
+           if (this.options.debug) {
+             console.log(`✅ Fallback button ${index + 1}:`, {
+               text: element.textContent?.trim().substring(0, 30),
+               className: element.className.substring(0, 50)
+             });
+           }
+         }
+       });
+     }
+     
+     if (this.options.debug) {
+       console.log(`🎯 Final result: ${buttons.length} comment buttons selected`);
+     }
+     
+     return buttons;
+   }
 
      /**
     * 기존 form 기반 방식 (fallback)
@@ -422,18 +482,21 @@ export class CommentInterceptor {
     });
   }
 
-  /**
-   * React 버튼 클릭을 intercept하는 핸들러 (Form 없는 GitHub 2024 UI)
-   */
-  private createReactButtonHandler(textarea: HTMLTextAreaElement, buttons: HTMLElement[]) {
-    return async (event: Event) => {
-      if (this.options.debug) {
-        console.log('🔔 CommentInterceptor: React button clicked', {
-          eventType: event.type,
-          buttonText: (event.target as HTMLElement)?.textContent?.trim(),
-          textareaValue: textarea.value?.substring(0, 50) + '...'
-        });
-      }
+     /**
+    * React 버튼 클릭을 intercept하는 핸들러 (Form 없는 GitHub 2024 UI)
+    */
+   private createReactButtonHandler(textarea: HTMLTextAreaElement, buttons: HTMLElement[]) {
+     return async (event: Event) => {
+       if (this.options.debug) {
+         console.log('🔔 CommentInterceptor: React button clicked!', {
+           eventType: event.type,
+           buttonText: (event.target as HTMLElement)?.textContent?.trim(),
+           textareaValue: textarea.value?.substring(0, 50) + '...',
+           textareaLength: textarea.value?.length || 0,
+           interceptorEnabled: this.options.enabled,
+           interceptorActive: this.isActive
+         });
+       }
 
       // URL 필터링 체크
       if (!this.isTranslatableURL(window.location.href)) {
@@ -723,17 +786,32 @@ export class CommentInterceptor {
         // React 컴포넌트용 버튼 클릭 핸들러 생성
         const handler = this.createReactButtonHandler(textarea, buttons);
         
-        // 모든 관련 버튼에 클릭 리스너 추가
-        buttons.forEach((button, index) => {
-          button.addEventListener('click', handler, true); // capture phase에서 실행
-          
-          if (this.options.debug) {
-            console.log(`🔔 Added click listener to button ${index + 1}:`, {
-              buttonText: button.textContent?.trim(),
-              buttonClass: button.className
-            });
-          }
-        });
+                 // 모든 관련 버튼에 클릭 리스너 추가
+         buttons.forEach((button, index) => {
+           button.addEventListener('click', handler, true); // capture phase에서 실행
+           
+           // 추가 디버깅: 모든 클릭 감지
+           button.addEventListener('click', (e) => {
+             if (this.options.debug) {
+               console.log(`🔔 DEBUG: Button ${index + 1} clicked (any click):`, {
+                 buttonText: button.textContent?.trim(),
+                 buttonClass: button.className,
+                 textareaValue: textarea.value.substring(0, 50) + '...',
+                 hasKorean: this.containsKorean(textarea.value)
+               });
+             }
+           }, false); // bubble phase에서도 확인
+           
+           if (this.options.debug) {
+             console.log(`🔔 Added click listener to button ${index + 1}:`, {
+               buttonText: button.textContent?.trim(),
+               buttonClass: button.className,
+               buttonType: button.getAttribute('type'),
+               buttonRole: button.getAttribute('role'),
+               buttonAriaLabel: button.getAttribute('aria-label')
+             });
+           }
+         });
         
         this.interceptedTextareas.add(textarea);
         interceptedCount++;
