@@ -50,6 +50,13 @@ export function detectPageType(): GitHubPageInfo {
 export function getTitleSelectors(pageType: GitHubPageInfo['type']): string[] {
   const selectors = {
     issue: [
+      // 🆕 2024 GitHub 새로운 UI 클래스들 (우선순위)
+      'h1 bdi', // 새로운 GitHub UI의 제목 패턴
+      'h1[class*="Header"] bdi',
+      'header h1 bdi',
+      '[class*="IssueHeader"] h1 bdi',
+      '[class*="IssuePullRequestHeader"] h1 bdi',
+      // 기존 셀렉터들 (fallback)
       '.js-issue-title', // 개별 이슈 페이지 제목
       'h1.gh-header-title .js-issue-title',
       'bdi.js-issue-title',
@@ -60,6 +67,14 @@ export function getTitleSelectors(pageType: GitHubPageInfo['type']): string[] {
       'h1[class*="gh-header-title"] span',
     ],
     pull_request: [
+      // 🆕 2024 GitHub 새로운 UI 클래스들 (우선순위)
+      'h1 bdi', // 새로운 GitHub UI의 제목 패턴
+      'h1[class*="Header"] bdi',
+      'header h1 bdi',
+      '[class*="IssueHeader"] h1 bdi',
+      '[class*="IssuePullRequestHeader"] h1 bdi',
+      '[class*="PullRequestHeader"] h1 bdi',
+      // 기존 셀렉터들 (fallback)
       '.js-issue-title', // PR도 동일한 구조 사용
       'h1.gh-header-title .js-issue-title',
       'bdi.js-issue-title',
@@ -512,6 +527,12 @@ export function getPRDescription(): ExtractedTitle[] {
   console.log(`📝 Extracting markdown content from ${pageInfo.type} page...`);
   
   const prDescriptionSelectors = [
+    // 🆕 2024 GitHub 새로운 UI 클래스들 (최고 우선순위)
+    '[class*="IssueBodyViewer-module__IssueBody"]',
+    '[class*="NewMarkdownViewer-module__safe-html-box"]',
+    '.markdown-body[class*="NewMarkdownViewer-module"]',
+    '[class*="Box-sc-"][class*="markdown-body"][class*="NewMarkdownViewer"]',
+    
     // 🎯 GitHub 최신 마크다운 컨테이너 클래스들 (우선순위 높음)
     '[class*="Box-sc-"][class*="markdown-body"]',
     '[class*="NewMarkdownViewer-module__safe-html-box"]', 
