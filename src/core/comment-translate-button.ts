@@ -194,10 +194,17 @@ export class CommentTranslateButton {
   }
 
   /**
-   * 번역 후 댓글 처리
+   * 번역 후 댓글 처리 (강화된 에러 처리)
    */
   private async handleTranslateAndComment(textarea: HTMLTextAreaElement, button: HTMLButtonElement): Promise<void> {
     const text = textarea.value.trim();
+
+    if (this.options.debug) {
+      console.log('🌐 CommentTranslateButton: Starting translation...', {
+        textLength: text.length,
+        textPreview: text.substring(0, 30) + '...'
+      });
+    }
 
     if (!text) {
       alert('댓글 내용을 입력해주세요.');
@@ -209,45 +216,86 @@ export class CommentTranslateButton {
       return;
     }
 
+    // 버튼 상태 저장
+    const originalText = button.innerHTML;
+    
     try {
       // 버튼 비활성화 및 로딩 표시
-      const originalText = button.innerHTML;
       button.disabled = true;
       button.innerHTML = '🔄 번역 중...';
+      button.style.opacity = '0.7';
       
-      // 텍스트 번역
-      const translatedText = await this.translateText(text, TranslationDirection.KO_TO_EN);
+      if (this.options.debug) {
+        console.log('🔄 Calling translation API...');
+      }
+      
+      // 텍스트 번역 (타임아웃 추가)
+      const translatedText = await Promise.race([
+        this.translateText(text, TranslationDirection.KO_TO_EN),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('번역 요청 타임아웃 (30초)')), 30000)
+        )
+      ]);
+      
+      if (this.options.debug) {
+        console.log('✅ Translation API success:', {
+          original: text.substring(0, 50) + '...',
+          translated: translatedText.substring(0, 50) + '...'
+        });
+      }
       
       // 번역된 텍스트로 textarea 업데이트
       textarea.value = translatedText;
       
       // 버튼 복원
       button.disabled = false;
-      button.innerHTML = originalText;
-      
-      // 성공 메시지
+      button.style.opacity = '1';
       button.innerHTML = '✅ 번역 완료!';
+      
+      // 2초 후 원래 텍스트로 복원
       setTimeout(() => {
         button.innerHTML = originalText;
       }, 2000);
 
       if (this.options.debug) {
-        console.log('✅ Translation completed:', {
-          original: text.substring(0, 50),
-          translated: translatedText.substring(0, 50)
-        });
+        console.log('🎉 Translation completed successfully!');
       }
 
       // 자동으로 댓글 제출 (선택적)
       // this.submitComment(textarea);
 
     } catch (error) {
-      // 오류 처리
+      // 상세한 오류 처리
       button.disabled = false;
-      button.innerHTML = originalText;
+      button.style.opacity = '1';
+      button.innerHTML = '❌ 번역 실패';
       
-      console.error('❌ Translation failed:', error);
-      alert(`번역 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      // 3초 후 원래 텍스트로 복원
+      setTimeout(() => {
+        button.innerHTML = originalText;
+      }, 3000);
+      
+      let errorMessage = '알 수 없는 오류';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      console.error('❌ CommentTranslateButton translation failed:', {
+        error: errorMessage,
+        originalText: text.substring(0, 50) + '...'
+      });
+      
+      // 사용자 친화적 에러 메시지
+      let userMessage = `번역 실패: ${errorMessage}`;
+      if (errorMessage.includes('API key')) {
+        userMessage = '번역 실패: OpenAI API 키를 확인해주세요.\n\nExtension 팝업에서 API 키를 설정해주세요.';
+      } else if (errorMessage.includes('타임아웃')) {
+        userMessage = '번역 실패: 요청이 너무 오래 걸립니다.\n\n네트워크 연결을 확인하고 다시 시도해주세요.';
+      } else if (errorMessage.includes('quota')) {
+        userMessage = '번역 실패: API 사용량이 초과되었습니다.\n\nOpenAI 계정을 확인해주세요.';
+      }
+      
+      alert(userMessage);
     }
   }
 
@@ -309,23 +357,65 @@ export class CommentTranslateButton {
   }
 
   /**
-   * 텍스트 번역 실행
+   * 텍스트 번역 실행 (강화된 디버깅)
    */
   private async translateText(text: string, direction: TranslationDirection): Promise<string> {
+    if (this.options.debug) {
+      console.log('🔗 CommentTranslateButton: Sending message to background script...', {
+        type: 'TRANSLATE_TEXT',
+        textLength: text.length,
+        direction: direction
+      });
+    }
+
     return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      
       chrome.runtime.sendMessage({
         type: 'TRANSLATE_TEXT',
         text: text,
         direction: direction
       }, (response) => {
+        const duration = Date.now() - startTime;
+        
+        if (this.options.debug) {
+          console.log(`📨 CommentTranslateButton: Received response (${duration}ms):`, {
+            success: response?.success,
+            hasTranslatedText: !!response?.translatedText,
+            error: response?.error,
+            lastError: chrome.runtime.lastError?.message
+          });
+        }
+
         if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+          const errorMsg = `Chrome runtime error: ${chrome.runtime.lastError.message}`;
+          console.error('❌ Chrome runtime error:', chrome.runtime.lastError);
+          reject(new Error(errorMsg));
+        } else if (!response) {
+          const errorMsg = 'No response from background script - is the extension running?';
+          console.error('❌ No response from background script');
+          reject(new Error(errorMsg));
         } else if (response.success) {
+          if (this.options.debug) {
+            console.log('✅ Translation successful:', {
+              originalLength: text.length,
+              translatedLength: response.translatedText?.length
+            });
+          }
           resolve(response.translatedText);
         } else {
-          reject(new Error(response.error || 'Translation failed'));
+          const errorMsg = response.error || 'Translation failed - unknown error';
+          console.error('❌ Translation API error:', response.error);
+          reject(new Error(errorMsg));
         }
       });
+      
+      // 메시지 전송 실패 감지 (5초 후 체크)
+      setTimeout(() => {
+        if (this.options.debug) {
+          console.log('⏰ Translation request status check...');
+        }
+      }, 5000);
     });
   }
 
