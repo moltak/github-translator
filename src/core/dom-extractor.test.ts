@@ -71,13 +71,13 @@ describe('DOM Extractor', () => {
   describe('getTitleSelectors', () => {
     test('should return correct selectors for issues list', () => {
       // given
-      const pageType = 'issues_list';
+      const pageType: GitHubPageInfo['type'] = 'issues_list';
       
       // when
       const selectors = getTitleSelectors(pageType);
       
       // then
-      expect(selectors).toContain('[class*="IssuePullRequestTitle-module__ListItemTitle"]');
+      expect(selectors).toContain('a[class*="IssuePullRequestTitle-module__ListItemTitle"]');
       expect(selectors.length).toBeGreaterThan(0);
     });
   });
@@ -476,5 +476,49 @@ describe('safeReplaceText - Complex HTML Structure Preservation', () => {
     expect(linkElement.textContent?.trim()).toBe('굵은 텍스트가 있는 복잡한 이슈 제목');
     expect(linkElement.href).toBe('https://github.com/owner/repo/issues/456'); // href가 보존되어야 함
     expect(linkElement.getAttribute('data-original-title')).toBe('Complex issue title with bold text');
+  });
+
+  test('should remove duplicate links when extracting titles', () => {
+    // given - GitHub의 실제 구조 시뮬레이션 (H3 + A 태그)
+    mockLocation('/owner/repo/issues');
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <div class="js-navigation-item">
+        <h3 class="Title-module__heading--upUxW IssuePullRequestTitle-module__ListItemTitle_0--UQ3gh">
+          Duplicate issue title
+        </h3>
+        <a href="https://github.com/owner/repo/issues/123" 
+           class="IssuePullRequestTitle-module__ListItemTitle_1--_xOfg">
+          Duplicate issue title
+        </a>
+      </div>
+      <div class="js-navigation-item">
+        <h3 class="Title-module__heading--upUxW IssuePullRequestTitle-module__ListItemTitle_0--UQ3gh">
+          Another issue title
+        </h3>
+        <a href="https://github.com/owner/repo/issues/124" 
+           class="IssuePullRequestTitle-module__ListItemTitle_1--_xOfg">
+          Another issue title
+        </a>
+      </div>
+    `;
+    document.body.appendChild(container);
+
+    // when
+    const titles = getIssueTitles();
+
+    // then
+    expect(titles.length).toBe(2); // H3 태그는 제외되고 A 태그만 2개
+    expect(titles.every(title => title.element.tagName === 'A')).toBe(true); // 모두 링크여야 함
+    
+    const hrefs = titles.map(title => (title.element as HTMLAnchorElement).href);
+    expect(hrefs).toEqual([
+      'https://github.com/owner/repo/issues/123',
+      'https://github.com/owner/repo/issues/124'
+    ]);
+    
+    // 중복 링크가 없어야 함
+    const uniqueHrefs = new Set(hrefs);
+    expect(uniqueHrefs.size).toBe(hrefs.length);
   });
 });
