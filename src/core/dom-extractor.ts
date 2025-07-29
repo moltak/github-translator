@@ -451,31 +451,15 @@ export function getPRDescription(): ExtractedTitle[] {
   console.log(`📝 Extracting markdown content from ${pageInfo.type} page...`);
   
   const prDescriptionSelectors = [
-    // 🆕 GitHub 최신 마크다운 컨테이너 클래스들
+    // 🎯 GitHub 최신 마크다운 컨테이너 클래스들 (우선순위 높음)
     '[class*="Box-sc-"][class*="markdown-body"]',
     '[class*="NewMarkdownViewer-module__safe-html-box"]', 
     '[class*="markdown-body"][class*="Box-sc-"]',
     
-    // 🆕 GitHub CSS Modules 패턴
+    // 🎯 GitHub CSS Modules 패턴
     '[class*="MarkdownViewer-module"]',
     '[class*="IssueDescription-module"]',
     '[class*="CommentBody-module"]',
-    
-    // 기존 선택자들
-    '.js-comment-body',                    // 메인 설명 영역
-    '.comment-body',                       // 대체 선택자
-    '.markdown-body',                      // 마크다운 렌더링 영역
-    '.js-task-list-container',             // 체크리스트 포함 영역
-    '[data-testid="issue-body"]',          // 최신 GitHub 테스트 ID
-    '.timeline-comment-wrapper:first-child .comment-body',  // 첫 번째 댓글 (PR 설명)
-    
-    // 🆕 포괄적 마크다운 선택자들
-    '[class*="markdown-body"]',
-    '[class*="comment-body"]',
-    '[class*="issue-body"]',
-    'div[data-testid*="markdown"]',
-    'div[data-testid*="issue"]',
-    'div[data-testid*="comment"]',
   ];
   
   const extractedDescriptions: ExtractedTitle[] = [];
