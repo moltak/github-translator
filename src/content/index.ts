@@ -1,6 +1,6 @@
 // Content Script for GitHub Translator Extension
 
-import { getIssueTitles, getPRDescription, safeReplaceText, restoreOriginalText, detectPageType } from '../core/dom-extractor';
+import { getIssueTitles, getPRDescription, getIssueComments, extractAndTranslateComments, safeReplaceText, restoreOriginalText, detectPageType } from '../core/dom-extractor';
 import { CommentInterceptor } from '../core/comment-interceptor';
 import { CommentTranslateButton } from '../core/comment-translate-button';
 
@@ -234,6 +234,41 @@ if (window.location.hostname === 'github.com') {
         console.log('🎉 Sprint 3.6 Complete: Translated', `${descSuccessCount}/${descriptions.length}`, 'PR description(s)!');
       } else {
         console.log('📋 No descriptions found to translate');
+      }
+
+      // 💬 Also translating existing comments...
+      console.log('💬 Also translating existing comments...');
+      const comments = getIssueComments();
+      
+      if (comments.length > 0) {
+        console.log(`💬 Found ${comments.length} comment(s) to translate`);
+        
+        const commentPromises = comments.map(async (comment) => {
+          try {
+            const response = await chrome.runtime.sendMessage({
+              type: 'TRANSLATE',
+              text: comment.text,
+              direction: 'EN_TO_KO'
+            });
+            
+            if (response.success) {
+              safeReplaceText(comment.element, response.translatedText);
+              return true;
+            }
+            return false;
+          } catch (error) {
+            console.error('❌ Comment translation failed:', error);
+            return false;
+          }
+        });
+        
+        const commentResults = await Promise.all(commentPromises);
+        const commentSuccessCount = commentResults.filter(r => r).length;
+        
+        console.log(`💬 Translated ${commentSuccessCount} comment(s)`);
+        console.log('🎉 Comment Translation Complete: Translated', `${commentSuccessCount}/${comments.length}`, 'comment(s)!');
+      } else {
+        console.log('💬 No existing comments found to translate');
       }
 
       // CommentInterceptor는 위에서 이미 설정됨

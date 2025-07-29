@@ -848,6 +848,124 @@ export async function extractAndTranslatePRDescription(): Promise<number> {
 }
 
 /**
+ * GitHub 이슈/PR의 기존 댓글들을 추출합니다 (2025 GitHub UI 대응)
+ */
+export function getIssueComments(): ExtractedTitle[] {
+  const pageInfo = detectPageType();
+  
+  // 이슈/PR 페이지가 아니면 빈 배열 반환
+  if (pageInfo.type !== 'issue' && pageInfo.type !== 'pull_request') {
+    return [];
+  }
+  
+  console.log(`💬 Extracting comments from ${pageInfo.type} page...`);
+  
+  const commentSelectors = [
+    // 🆕 2024-2025 GitHub 새로운 댓글 본문 클래스들 (최고 우선순위)
+    '[class*="IssueCommentViewer-module__IssueCommentBody"]',
+    '[class*="CommentViewer-module__CommentBody"]',
+    '[class*="CommentBody-module__CommentBody"]',
+    
+    // 🎯 GitHub 기존 댓글 컨테이너 클래스들
+    '[class*="Box-sc-"][class*="markdown-body"]',
+    '[class*="NewMarkdownViewer-module__safe-html-box"]',
+    '.js-comment-body',
+    '.comment-body',
+    
+    // 🎯 마크다운 기반 댓글
+    '.markdown-body[class*="comment"]',
+    '[class*="MarkdownViewer-module"]',
+  ];
+  
+  const extractedComments: ExtractedTitle[] = [];
+  
+  for (const [index, selector] of commentSelectors.entries()) {
+    try {
+      const elements = document.querySelectorAll<HTMLElement>(selector);
+      console.log(`🎯 Comment Selector ${index + 1}: "${selector}" found ${elements.length} elements`);
+      
+      elements.forEach((element, elemIndex) => {
+        const text = element.textContent?.trim() || '';
+        const classList = element.className || 'no-class';
+        const tagName = element.tagName;
+        
+        console.log(`  💬 Comment ${elemIndex + 1}:`, {
+          tagName,
+          text: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+          classes: classList.substring(0, 80) + (classList.length > 80 ? '...' : ''),
+          textLength: text.length,
+          element: element
+        });
+        
+        // 의미있는 댓글 텍스트가 있고, 이미 추출되지 않은 요소만 처리
+        if (text && text.length > 10 && !extractedComments.some(comment => comment.element === element)) {
+          // 너무 짧은 텍스트나 버튼 텍스트는 제외
+          const isButtonOrShortText = text.length < 10 || 
+            text.includes('👍') || text.includes('👎') || 
+            text.includes('Reply') || text.includes('Edit') ||
+            text.includes('reaction');
+            
+          if (!isButtonOrShortText) {
+            extractedComments.push({
+              element,
+              text,
+              selector,
+              index: extractedComments.length,
+              originalText: text,
+              isReplaced: false,
+            });
+            
+            console.log(`    ✅ Added comment: "${text.substring(0, 50)}..." (${selector})`);
+          } else {
+            console.log(`    ⏭️ Skipped (button/short text: ${text.length} chars)`);
+          }
+        } else if (text.length <= 10) {
+          console.log(`    ⏭️ Skipped (text too short: ${text.length} chars)`);
+        } else if (extractedComments.some(comment => comment.element === element)) {
+          console.log(`    ⏭️ Skipped (already extracted)`);
+        }
+      });
+      
+      // 첫 번째로 요소를 찾은 선택자 사용 후 종료
+      if (elements.length > 0) {
+        console.log(`🎯 Using comment selector: "${selector}" (found ${elements.length} elements)`);
+        break;
+      }
+    } catch (error) {
+      console.warn(`⚠️ Invalid comment selector: ${selector}`, error);
+    }
+  }
+  
+  console.log(`💬 Found ${extractedComments.length} comment(s) for translation`);
+  
+  if (extractedComments.length > 0) {
+    console.log('💬 Comments found:');
+    extractedComments.forEach((comment, index) => {
+      console.log(`  ${index + 1}. "${comment.text.substring(0, 80)}..." (${comment.selector})`);
+    });
+  }
+  
+  return extractedComments;
+}
+
+/**
+ * 추출된 댓글들을 번역합니다
+ */
+export async function extractAndTranslateComments(): Promise<number> {
+  const comments = getIssueComments();
+  
+  if (comments.length === 0) {
+    console.log('📭 No comments found to translate');
+    return 0;
+  }
+  
+  const successCount = await replaceTitlesWithTranslation(comments);
+  console.log(`🎉 Comment Translation Complete: Translated ${successCount}/${comments.length} comment(s)!`);
+  
+  return successCount;
+}
+
+/**
  * DOM이 변경될 때까지 대기하는 유틸리티 함수
  */
 export function waitForDOM(timeout = 3000): Promise<void> {
