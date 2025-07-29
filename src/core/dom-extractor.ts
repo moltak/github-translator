@@ -448,23 +448,55 @@ export function getPRDescription(): ExtractedTitle[] {
     return [];
   }
   
+  console.log(`📝 Extracting markdown content from ${pageInfo.type} page...`);
+  
   const prDescriptionSelectors = [
+    // 🆕 GitHub 최신 마크다운 컨테이너 클래스들
+    '[class*="Box-sc-"][class*="markdown-body"]',
+    '[class*="NewMarkdownViewer-module__safe-html-box"]', 
+    '[class*="markdown-body"][class*="Box-sc-"]',
+    
+    // 🆕 GitHub CSS Modules 패턴
+    '[class*="MarkdownViewer-module"]',
+    '[class*="IssueDescription-module"]',
+    '[class*="CommentBody-module"]',
+    
+    // 기존 선택자들
     '.js-comment-body',                    // 메인 설명 영역
     '.comment-body',                       // 대체 선택자
     '.markdown-body',                      // 마크다운 렌더링 영역
     '.js-task-list-container',             // 체크리스트 포함 영역
     '[data-testid="issue-body"]',          // 최신 GitHub 테스트 ID
     '.timeline-comment-wrapper:first-child .comment-body',  // 첫 번째 댓글 (PR 설명)
+    
+    // 🆕 포괄적 마크다운 선택자들
+    '[class*="markdown-body"]',
+    '[class*="comment-body"]',
+    '[class*="issue-body"]',
+    'div[data-testid*="markdown"]',
+    'div[data-testid*="issue"]',
+    'div[data-testid*="comment"]',
   ];
   
   const extractedDescriptions: ExtractedTitle[] = [];
   
-  for (const selector of prDescriptionSelectors) {
+  for (const [index, selector] of prDescriptionSelectors.entries()) {
     try {
       const elements = document.querySelectorAll<HTMLElement>(selector);
+      console.log(`🎯 Selector ${index + 1}: "${selector}" found ${elements.length} elements`);
       
-      elements.forEach((element, index) => {
+      elements.forEach((element, elemIndex) => {
         const text = element.textContent?.trim() || '';
+        const classList = element.className || 'no-class';
+        const tagName = element.tagName;
+        
+        console.log(`  📋 Element ${elemIndex + 1}:`, {
+          tagName,
+          text: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+          classes: classList,
+          textLength: text.length,
+          element: element
+        });
         
         // 의미있는 텍스트가 있고, 이미 추출되지 않은 요소만 처리
         if (text && text.length > 20 && !extractedDescriptions.some(desc => desc.element === element)) {
@@ -472,20 +504,38 @@ export function getPRDescription(): ExtractedTitle[] {
             element,
             text,
             selector,
-            index,
+            index: extractedDescriptions.length,
             originalText: text,
             isReplaced: false,
           });
           
-          console.log(`📝 Found PR description: "${text.substring(0, 50)}..." (${selector})`);
+          console.log(`    ✅ Added markdown content: "${text.substring(0, 50)}..." (${selector})`);
+        } else if (text.length <= 20) {
+          console.log(`    ⏭️ Skipped (text too short: ${text.length} chars)`);
+        } else if (extractedDescriptions.some(desc => desc.element === element)) {
+          console.log(`    ⏭️ Skipped (already extracted)`);
         }
       });
+      
+      // 첫 번째로 요소를 찾은 선택자 사용 후 종료
+      if (elements.length > 0) {
+        console.log(`🎯 Using selector: "${selector}" (found ${elements.length} elements)`);
+        break;
+      }
     } catch (error) {
       console.warn(`⚠️ Invalid PR description selector: ${selector}`, error);
     }
   }
   
-  console.log(`📋 Found ${extractedDescriptions.length} PR description(s)`);
+  console.log(`📋 Found ${extractedDescriptions.length} markdown content(s) for translation`);
+  
+  if (extractedDescriptions.length > 0) {
+    console.log('📝 Markdown contents found:');
+    extractedDescriptions.forEach((desc, index) => {
+      console.log(`  ${index + 1}. "${desc.text.substring(0, 80)}..." (${desc.selector})`);
+    });
+  }
+  
   return extractedDescriptions;
 }
 

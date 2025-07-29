@@ -1,6 +1,6 @@
 // DOM Extractor unit tests
 
-import { detectPageType, getTitleSelectors, getIssueTitles, replaceTitles, restoreTitles, extractAndReplaceTitles } from './dom-extractor';
+import { detectPageType, getTitleSelectors, getIssueTitles, replaceTitles, restoreTitles, extractAndReplaceTitles, getPRDescription } from './dom-extractor';
 
 // Mock window.location
 const mockLocation = (pathname: string, href?: string) => {
@@ -520,5 +520,74 @@ describe('safeReplaceText - Complex HTML Structure Preservation', () => {
     // 중복 링크가 없어야 함
     const uniqueHrefs = new Set(hrefs);
     expect(uniqueHrefs.size).toBe(hrefs.length);
+  });
+
+  test('should extract GitHub markdown content with new CSS selectors', () => {
+    // given - GitHub Issues 페이지 시뮬레이션
+    mockLocation('/owner/repo/issues/123');
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <div class="Box-sc-g0xbh4-0 markdown-body NewMarkdownViewer-module__safe-html-box--cRsz0">
+        <h3>Problem Description</h3>
+        <p>I got a super long Error trace in the error: RuntimeError: batch size must be positive. 
+        I guess it's because the input_ids are zeros.</p>
+        
+        <h3>Environment</h3>
+        <ul>
+          <li>4*80G A100</li>
+          <li>pytorch version: 2.4</li>
+          <li>Flash-Attention version: 2.8.1</li>
+        </ul>
+        
+        <h3>What I Tried</h3>
+        <p>I patched _forward_micro_batch to short-circuit when the de-duplicated batch is empty:</p>
+        <pre><code>if input_ids_rmpad.size(1) == 0:
+    full_entropy = torch.zeros((batch_size, seqlen), device=input_ids.device)
+    return entropy, log_probs</code></pre>
+      </div>
+    `;
+    document.body.appendChild(container);
+
+    // when
+    const descriptions = getPRDescription();
+
+    // then
+    expect(descriptions.length).toBe(1);
+    expect(descriptions[0].element.tagName).toBe('DIV');
+    expect(descriptions[0].text).toContain('Problem Description');
+    expect(descriptions[0].text).toContain('RuntimeError: batch size must be positive');
+    expect(descriptions[0].text).toContain('Environment');
+    expect(descriptions[0].text).toContain('What I Tried');
+    expect(descriptions[0].selector).toBe('[class*="Box-sc-"][class*="markdown-body"]');
+  });
+
+  test('should extract multiple markdown sections from GitHub issue', () => {
+    // given - 복잡한 GitHub Issues 구조
+    mockLocation('/owner/repo/issues/456');
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <div class="MarkdownViewer-module__content--abc123">
+        <h2>Bug Report</h2>
+        <p>This is a detailed bug report with multiple sections.</p>
+      </div>
+      <div class="CommentBody-module__wrapper--def456">
+        <h3>Steps to Reproduce</h3>
+        <ol>
+          <li>Run the script</li>
+          <li>Check the output</li>
+          <li>Notice the error</li>
+        </ol>
+      </div>
+    `;
+    document.body.appendChild(container);
+
+    // when
+    const descriptions = getPRDescription();
+
+    // then
+    expect(descriptions.length).toBe(1); // 첫 번째 매치만 사용
+    expect(descriptions[0].text).toContain('Bug Report');
+    expect(descriptions[0].text).toContain('detailed bug report');
+    expect(descriptions[0].selector).toBe('[class*="MarkdownViewer-module"]');
   });
 });
