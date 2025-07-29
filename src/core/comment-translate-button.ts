@@ -362,7 +362,7 @@ export class CommentTranslateButton {
   private async translateText(text: string, direction: TranslationDirection): Promise<string> {
     if (this.options.debug) {
       console.log('🔗 CommentTranslateButton: Sending message to background script...', {
-        type: 'TRANSLATE_TEXT',
+        type: 'TRANSLATE',
         textLength: text.length,
         direction: direction
       });
@@ -372,7 +372,7 @@ export class CommentTranslateButton {
       const startTime = Date.now();
       
       chrome.runtime.sendMessage({
-        type: 'TRANSLATE_TEXT',
+        type: 'TRANSLATE',
         text: text,
         direction: direction
       }, (response) => {
