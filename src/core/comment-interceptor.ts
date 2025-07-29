@@ -56,38 +56,61 @@ export class CommentInterceptor {
   }
 
   /**
-   * GitHub 댓글 form을 찾는 함수
+   * GitHub 댓글 form을 찾는 함수 (동적 클래스명 대응)
    */
   private findCommentForms(): HTMLFormElement[] {
-    const selectors = [
-      // 2024년 최신 GitHub 댓글 form 셀렉터
+    // 동적 해시 클래스명에 대응하기 위해 속성 기반 셀렉터 사용
+    const forms: HTMLFormElement[] = [];
+    
+    // 1. Action 기반 - 가장 안정적
+    const actionBasedSelectors = [
       'form[action*="/comment"]',
       'form[action*="/comments"]',
-      'form.js-new-comment-form',
-      'form.new-comment-form',
-      'form.comment-form',
-      'form.js-comment-form',
-      'form.new_comment',
-      'form[data-turbo-permanent]',
-      // GitHub 이슈/PR 댓글 form (action 패턴)
       'form[action*="/issues/"][action*="/comments"]',
       'form[action*="/pull/"][action*="/comments"]',
       'form[action*="/discussions/"][action*="/comments"]',
-      // 최신 GitHub form 패턴 (has 셀렉터는 브라우저 호환성 고려하여 제거)
-      'form textarea[name="comment[body]"]',
-      'form textarea[placeholder*="comment"]',
-      'form textarea[aria-label*="comment"]',
-      // 2024년 추가된 GitHub 클래스들
-      'form.timeline-comment-form',
-      'form.discussion-comment-form',
-      'form[data-target="new-comment.form"]',
-      // 일반적인 form 패턴 (fallback)
-      'form:has(textarea)',
     ];
-
-    const forms: HTMLFormElement[] = [];
     
-    for (const selector of selectors) {
+    // 2. Data 속성 기반 - GitHub의 컴포넌트 식별자
+    const dataBasedSelectors = [
+      'form[data-target*="comment"]',
+      'form[data-turbo-permanent]',
+      'form[data-testid*="comment"]',
+      'form[data-component*="comment"]',
+    ];
+    
+    // 3. 텍스트 기반 - textarea 내용으로 form 찾기
+    const textareaBasedApproach = () => {
+      const textareas = document.querySelectorAll('textarea');
+      textareas.forEach(textarea => {
+        const form = textarea.closest('form');
+        if (form && this.isCommentTextarea(textarea)) {
+          if (!forms.includes(form)) {
+            forms.push(form);
+          }
+        }
+      });
+    };
+    
+    // 4. 구조적 접근 - button과 textarea 조합으로 댓글 form 찾기
+    const structuralApproach = () => {
+      const allForms = document.querySelectorAll('form');
+      allForms.forEach(form => {
+        const textarea = form.querySelector('textarea');
+        const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
+        
+        if (textarea && submitButton && this.isCommentTextarea(textarea)) {
+          if (!forms.includes(form)) {
+            forms.push(form);
+          }
+        }
+      });
+    };
+    
+         // 각 전략을 순차적으로 적용
+     const allSelectors = [...actionBasedSelectors, ...dataBasedSelectors];
+    
+    for (const selector of allSelectors) {
       try {
         // has() 셀렉터나 복잡한 셀렉터 대신 더 단순한 방식으로 처리
         if (selector.includes('textarea[')) {
@@ -121,6 +144,10 @@ export class CommentInterceptor {
         }
       }
     }
+    
+    // Fallback 전략들 실행
+    textareaBasedApproach();
+    structuralApproach();
 
     if (this.options.debug) {
       console.log('📝 Found comment forms:', forms.length);
@@ -138,46 +165,63 @@ export class CommentInterceptor {
   }
 
   /**
-   * Form 내의 댓글 textarea를 찾는 함수
+   * Textarea가 댓글 입력 필드인지 판별하는 헬퍼 메서드
+   */
+  private isCommentTextarea(textarea: HTMLTextAreaElement): boolean {
+    // name 속성 확인
+    const name = textarea.name?.toLowerCase();
+    if (name && (name.includes('comment') || name.includes('body'))) {
+      return true;
+    }
+    
+    // placeholder 확인
+    const placeholder = textarea.placeholder?.toLowerCase();
+    if (placeholder && (
+      placeholder.includes('comment') ||
+      placeholder.includes('leave a comment') ||
+      placeholder.includes('add a comment') ||
+      placeholder.includes('write a comment')
+    )) {
+      return true;
+    }
+    
+    // aria-label 확인
+    const ariaLabel = textarea.getAttribute('aria-label')?.toLowerCase();
+    if (ariaLabel && (
+      ariaLabel.includes('comment') ||
+      ariaLabel.includes('leave a comment') ||
+      ariaLabel.includes('add a comment') ||
+      ariaLabel.includes('write a comment')
+    )) {
+      return true;
+    }
+    
+    // data 속성 확인
+    const dataTestId = textarea.getAttribute('data-testid')?.toLowerCase();
+    if (dataTestId && dataTestId.includes('comment')) {
+      return true;
+    }
+    
+    // 부모 form의 action으로 확인
+    const form = textarea.closest('form');
+    if (form?.action && form.action.includes('comment')) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Form 내의 댓글 textarea를 찾는 함수 (동적 클래스명 대응)
    */
   private findCommentTextarea(form: HTMLFormElement): HTMLTextAreaElement | null {
-    const selectors = [
-      // 2024년 최신 GitHub 댓글 필드
-      'textarea[name="comment[body]"]',
-      'textarea[name="body"]',
-      'textarea[name="comment"]',
-      // aria-label 기반 (더 넓은 범위)
-      'textarea[aria-label*="comment"]',
-      'textarea[aria-label*="Comment"]',
-      'textarea[aria-label*="Add a comment"]',
-      'textarea[aria-label*="Leave a comment"]',
-      'textarea[aria-label*="Write a comment"]',
-      // placeholder 기반 (더 넓은 범위)
-      'textarea[placeholder*="comment"]',
-      'textarea[placeholder*="Comment"]',
-      'textarea[placeholder*="Add a comment"]',
-      'textarea[placeholder*="Leave a comment"]',
-      'textarea[placeholder*="Write a comment"]',
-      // 2024년 GitHub UI 업데이트에 따른 새로운 ID/클래스
-      'textarea#comment_body',
-      'textarea#new_comment_field',
-      'textarea#comment-body',
-      'textarea#new-comment-field',
-      // 최신 클래스 기반
-      'textarea.comment-form-textarea',
-      'textarea.js-comment-field',
-      'textarea.timeline-comment-textarea',
-      'textarea.discussion-comment-textarea',
-      'textarea[data-target*="comment"]',
-      // 일반적인 textarea (form 내 첫 번째) - 마지막 fallback
-      'textarea'
-    ];
-
-    for (const selector of selectors) {
-      const textarea = form.querySelector(selector) as HTMLTextAreaElement;
-      if (textarea) {
+    // 모든 textarea를 찾아서 댓글 텍스트 영역인지 확인
+    const textareas = form.querySelectorAll('textarea') as NodeListOf<HTMLTextAreaElement>;
+    
+    for (const textarea of textareas) {
+      if (this.isCommentTextarea(textarea)) {
         if (this.options.debug) {
-          console.log(`✅ Found textarea with selector: ${selector}`, {
+          console.log(`✅ Found comment textarea:`, {
             name: textarea.name,
             placeholder: textarea.placeholder,
             ariaLabel: textarea.getAttribute('aria-label'),
@@ -189,7 +233,12 @@ export class CommentInterceptor {
     }
 
     if (this.options.debug) {
-      console.warn('❌ No textarea found in form:', form);
+      console.warn('❌ No comment textarea found in form:', form);
+      console.log('Available textareas:', Array.from(textareas).map(ta => ({
+        name: ta.name,
+        placeholder: ta.placeholder,
+        ariaLabel: ta.getAttribute('aria-label')
+      })));
     }
     return null;
   }

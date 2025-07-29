@@ -1,7 +1,9 @@
-// GitHub Comment Forms Debug Script
+// GitHub Comment Forms Debug Script - Dynamic Classes Edition
 // 브라우저 콘솔에서 실행하여 현재 페이지의 댓글 양식을 분석합니다.
+// GitHub의 동적 해시 클래스명 (예: prc-Button-ButtonBase-c50BI)에 대응
 
-console.log('🔍 GitHub Comment Forms Analysis Starting...');
+console.log('🔍 GitHub Comment Forms Analysis Starting (Dynamic Classes Edition)...');
+console.log('🎯 Analyzing GitHub\'s new dynamic class naming system...');
 
 // 1. 현재 URL 분석
 console.log('📍 Current URL:', window.location.href);
@@ -14,28 +16,43 @@ console.log('🎯 URL Analysis:', {
   includes_pull: pathname.includes('/pull')
 });
 
-// 2. CommentInterceptor에서 사용하는 form 셀렉터들 테스트
-const selectors = [
-  // GitHub 새 댓글 form
-  'form[data-turbo-permanent]',
-  'form.js-new-comment-form',
-  'form.new_comment',
-  // GitHub 이슈/PR 댓글 form
+// 2. 동적 클래스명 분석
+console.log('🔍 Analyzing dynamic CSS classes...');
+const allElements = document.querySelectorAll('*[class*="prc-"], *[class*="Button"], *[class*="Form"]');
+const dynamicClasses = new Set();
+
+allElements.forEach(el => {
+  Array.from(el.classList).forEach(className => {
+    if (className.includes('prc-') || /^[a-zA-Z]+-[a-zA-Z]+-[a-zA-Z0-9]{5}$/.test(className)) {
+      dynamicClasses.add(className);
+    }
+  });
+});
+
+console.log('🎯 Found dynamic classes:', Array.from(dynamicClasses).slice(0, 20));
+
+// 3. 새로운 CommentInterceptor 전략 테스트
+const actionBasedSelectors = [
+  'form[action*="/comment"]',
+  'form[action*="/comments"]',
   'form[action*="/issues/"][action*="/comments"]',
   'form[action*="/pull/"][action*="/comments"]',
-  // 일반적인 GitHub form 패턴
-  'form:has(textarea[name="comment[body]"])',
-  'form:has(textarea[placeholder*="comment"])',
-  'form:has(textarea[aria-label*="comment"])',
-  // 특정 GitHub 클래스들
-  'form.js-comment-form',
-  'form.comment-form',
+  'form[action*="/discussions/"][action*="/comments"]',
 ];
 
-console.log('📝 Testing form selectors...');
+const dataBasedSelectors = [
+  'form[data-target*="comment"]',
+  'form[data-turbo-permanent]',
+  'form[data-testid*="comment"]',
+  'form[data-component*="comment"]',
+];
+
+const allSelectors = [...actionBasedSelectors, ...dataBasedSelectors];
+
+console.log('📝 Testing modern form selectors...');
 const foundForms = [];
 
-selectors.forEach((selector, index) => {
+allSelectors.forEach((selector, index) => {
   try {
     const elements = document.querySelectorAll(selector);
     if (elements.length > 0) {
