@@ -18,7 +18,7 @@
 
 - 🌍 **언어 장벽 제거**: 영어 이슈/PR을 한국어로 실시간 번역
 - 🚀 **참여도 향상**: 이해하기 쉬운 한국어로 더 적극적인 기여 가능
-- 💡 **효율성 증대**: 번역 도구 없이 바로 GitHub에서 소통
+- 💡 **효율성 향상**: 번역 도구 없이 바로 GitHub에서 소통
 
 ---
 
@@ -186,7 +186,7 @@ npm run build
 
 ## 📊 프로젝트 통계
 
-- **개발 기간**: 3주
+- **총 작업 시간**: 대략 10시간
 - **총 커밋**: 64개
 - **코드 라인**: ~2,500 lines
 - **지원 언어**: Korean ↔ English
@@ -194,33 +194,3 @@ npm run build
 - **Chrome Store**: 준비 중
 
 ---
-
-## 🤝 기여하기
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📄 라이선스
-
-이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 `LICENSE` 파일을 참조하세요.
-
----
-
-## 👨‍💻 만든 사람
-
-**[@moltak](https://github.com/moltak)**
-- 🌐 GitHub: [@moltak](https://github.com/moltak)
-- 📧 Email: [Your Email]
-
----
-
-<div align="center">
-
-**⭐ 이 프로젝트가 도움이 되었다면 스타를 눌러주세요! ⭐**
-
-</div>
