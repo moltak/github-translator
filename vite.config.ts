@@ -17,15 +17,16 @@ export default defineConfig({
       },
       output: {
         entryFileNames: '[name].js',
-        chunkFileNames: '[name].js',
+        chunkFileNames: '[name].js', 
         assetFileNames: '[name].[ext]',
-        format: 'es', // ES modules으로 변경
-      }
+        format: 'es',
+      },
+      external: [], // 모든 의존성을 번들에 포함
     },
-    target: 'es2020', // Chrome Extension에서 안정적으로 지원되는 버전
-    minify: false, // Chrome Extension에서는 디버깅을 위해 minify 비활성화
+    target: 'es2020',
+    minify: false,
     sourcemap: true,
-    copyPublicDir: false, // public 디렉토리 복사 비활성화
+    copyPublicDir: false,
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
