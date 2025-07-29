@@ -415,4 +415,66 @@ describe('safeReplaceText - Complex HTML Structure Preservation', () => {
     const replaced = replaceTitles(items, '번역된 텍스트');
     expect(replaced).toBe(0); // 텍스트가 없으므로 교체되지 않음
   });
+
+  test('should preserve href when replacing text in link elements', () => {
+    // given
+    const linkElement = document.createElement('a');
+    linkElement.href = 'https://github.com/owner/repo/issues/123';
+    linkElement.textContent = 'Original issue title';
+    linkElement.className = 'Link--primary';
+    document.body.appendChild(linkElement);
+
+    const items: ExtractedTitle[] = [{
+      element: linkElement,
+      text: 'Original issue title',
+      selector: 'a.Link--primary',
+      index: 0,
+      originalText: 'Original issue title',
+      isReplaced: false
+    }];
+
+    // when
+    const replaced = replaceTitles(items, '번역된 이슈 제목');
+
+    // then
+    expect(replaced).toBe(1);
+    expect(linkElement.textContent).toBe('번역된 이슈 제목');
+    expect(linkElement.href).toBe('https://github.com/owner/repo/issues/123'); // href가 보존되어야 함
+    expect(linkElement.getAttribute('data-original-title')).toBe('Original issue title');
+    expect(linkElement.getAttribute('data-github-translator')).toBe('replaced');
+  });
+
+  test('should preserve href when replacing text in complex link structures', () => {
+    // given
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <div class="js-navigation-item">
+        <a href="https://github.com/owner/repo/issues/456" class="Link--primary v-align-middle">
+          <span class="markdown-title">
+            Complex issue title with <strong>bold</strong> text
+          </span>
+        </a>
+      </div>
+    `;
+    document.body.appendChild(container);
+
+    const linkElement = container.querySelector('a') as HTMLAnchorElement;
+    const items: ExtractedTitle[] = [{
+      element: linkElement,
+      text: 'Complex issue title with bold text',
+      selector: 'a.Link--primary',
+      index: 0,
+      originalText: 'Complex issue title with bold text',
+      isReplaced: false
+    }];
+
+    // when
+    const replaced = replaceTitles(items, '굵은 텍스트가 있는 복잡한 이슈 제목');
+
+    // then
+    expect(replaced).toBe(1);
+    expect(linkElement.textContent?.trim()).toBe('굵은 텍스트가 있는 복잡한 이슈 제목');
+    expect(linkElement.href).toBe('https://github.com/owner/repo/issues/456'); // href가 보존되어야 함
+    expect(linkElement.getAttribute('data-original-title')).toBe('Complex issue title with bold text');
+  });
 });

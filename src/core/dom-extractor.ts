@@ -485,71 +485,98 @@ export function getPRDescription(): ExtractedTitle[] {
 
 /**
  * GitHub 이슈/PR 제목들을 추출합니다.
+ * Sprint 2.1: Issue title scraper implementation
  */
 export function getIssueTitles(): ExtractedTitle[] {
   const pageInfo = detectPageType();
   const selectors = getTitleSelectors(pageInfo.type);
+  
+  console.log(`🔍 Searching for titles on ${pageInfo.type} page using ${selectors.length} selectors...`);
+  
   const extractedTitles: ExtractedTitle[] = [];
   
-  // 각 선택자로 요소들을 찾아보기
-  for (const selector of selectors) {
-    try {
-      const elements = document.querySelectorAll<HTMLElement>(selector);
-      
-      if (elements.length > 0) {
-        elements.forEach((element, index) => {
-          const text = element.textContent?.trim() || '';
-          if (text && text.length > 3) { // 의미있는 텍스트만 추출
-            extractedTitles.push({
-              element,
-              text,
-              selector,
-              index,
-              originalText: text,
-              isReplaced: replacedElements.has(element),
-            });
-          }
+  for (const [index, selector] of selectors.entries()) {
+    const elements = document.querySelectorAll(selector);
+    console.log(`🎯 Selector ${index + 1}: "${selector}" found ${elements.length} elements`);
+    
+    if (elements.length > 0) {
+      elements.forEach((element, elemIndex) => {
+        const htmlElement = element as HTMLElement;
+        const text = htmlElement.textContent?.trim() || '';
+        
+        // 🔍 링크 디버깅 정보 추가
+        const isLink = htmlElement.tagName === 'A';
+        const href = isLink ? (htmlElement as HTMLAnchorElement).href : 'N/A';
+        const classList = htmlElement.className || 'no-class';
+        
+        console.log(`  📋 Element ${elemIndex + 1}:`, {
+          tagName: htmlElement.tagName,
+          isLink,
+          href: isLink ? href : 'Not a link',
+          text: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+          classes: classList,
+          element: htmlElement
         });
         
-        // 첫 번째로 매치되는 선택자 사용 (중복 방지)
-        if (extractedTitles.length > 0) {
-          break;
-        }
-      }
-    } catch (error) {
-      console.warn(`⚠️ Invalid selector: "${selector}"`, error);
-    }
-  }
-  
-  // 선택자로 찾지 못한 경우, 포괄적 검색 실행
-  if (extractedTitles.length === 0) {
-    console.log('🔍 Running comprehensive search for titles...');
-    const allTitles = findAllPossibleTitles();
-    
-    if (allTitles.length > 0) {
-      console.log(`🎯 Found ${allTitles.length} potential titles via comprehensive search`);
-      allTitles.forEach((title, index) => {
-        if (index < 10) { // 처음 10개만 표시
-          console.log(`  🔎 ${index + 1}. "${title.text}" (${title.selector})`);
+        if (text.length > 3) {
+          extractedTitles.push({
+            element: htmlElement,
+            text,
+            selector,
+            index: extractedTitles.length,
+            originalText: text,
+            isReplaced: false
+          });
+          console.log(`    ✅ Added to extraction list (isLink: ${isLink}, href: ${href})`);
+        } else {
+          console.log(`    ⏭️ Skipped (text too short: "${text}")`);
         }
       });
       
-      // Issues/PRs 패턴 필터링
-      const filteredTitles = allTitles.filter(title => 
-        title.text.length > 10 && // 충분히 긴 텍스트
-        ((title.element as HTMLAnchorElement).href?.includes('/issues/') || 
-         (title.element as HTMLAnchorElement).href?.includes('/pull/') ||
-         title.selector.includes('Issue') ||
-         title.selector.includes('Pull'))
-      );
-      
-      extractedTitles.push(...filteredTitles.slice(0, 20)); // 최대 20개
+      // 첫 번째로 요소를 찾은 선택자 사용 후 종료
+      break;
     }
   }
   
-  // 간단한 결과 로깅
+  if (extractedTitles.length === 0) {
+    console.log('🔍 Running comprehensive search for titles...');
+    
+    // 포괄적 검색 수행
+    const allPossibleTitles = findAllPossibleTitles();
+    extractedTitles.push(...allPossibleTitles);
+    
+    // 🔍 포괄적 검색 결과도 링크 정보 로깅
+    allPossibleTitles.forEach((title, index) => {
+      const isLink = title.element.tagName === 'A';
+      const href = isLink ? (title.element as HTMLAnchorElement).href : 'N/A';
+      console.log(`  🔍 Comprehensive search result ${index + 1}:`, {
+        tagName: title.element.tagName,
+        isLink,
+        href: isLink ? href : 'Not a link',
+        text: title.text.substring(0, 30) + '...',
+        selector: title.selector
+      });
+    });
+  }
+  
   if (extractedTitles.length > 0) {
     console.log(`📄 Found ${extractedTitles.length} titles on ${pageInfo.type} page`);
+    
+    // 🔍 링크 통계 정보
+    const linkCount = extractedTitles.filter(title => title.element.tagName === 'A').length;
+    const nonLinkCount = extractedTitles.length - linkCount;
+    console.log(`🔗 Link analysis: ${linkCount} links, ${nonLinkCount} non-links`);
+    
+    if (linkCount > 0) {
+      console.log('🔗 Links found:');
+      extractedTitles
+        .filter(title => title.element.tagName === 'A')
+        .forEach((title, index) => {
+          const href = (title.element as HTMLAnchorElement).href;
+          console.log(`  ${index + 1}. "${title.text.substring(0, 40)}..." → ${href}`);
+        });
+    }
+    
   } else {
     console.warn('⚠️ No titles found on this page');
   }
