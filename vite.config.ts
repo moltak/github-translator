@@ -18,10 +18,11 @@ export default defineConfig({
       output: {
         entryFileNames: '[name].js',
         chunkFileNames: '[name].js',
-        assetFileNames: '[name].[ext]'
+        assetFileNames: '[name].[ext]',
+        format: 'es', // ES modules으로 변경
       }
     },
-    target: 'esnext',
+    target: 'es2020', // Chrome Extension에서 안정적으로 지원되는 버전
     minify: false, // Chrome Extension에서는 디버깅을 위해 minify 비활성화
     sourcemap: true,
     copyPublicDir: false, // public 디렉토리 복사 비활성화

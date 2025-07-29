@@ -19,6 +19,7 @@
     {
       "matches": ["https://github.com/*"],
       "js": ["content.js"],
+      "type": "module",
       "run_at": "document_idle"
     }
   ],
