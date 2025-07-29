@@ -55,60 +55,102 @@ export class CommentInterceptor {
     return koreanRegex.test(text);
   }
 
-  /**
-   * GitHub 댓글 form을 찾는 함수 (동적 클래스명 대응)
+    /**
+   * GitHub 댓글 form을 찾는 함수 (2024 React UI 대응)
    */
   private findCommentForms(): HTMLFormElement[] {
-    // 동적 해시 클래스명에 대응하기 위해 속성 기반 셀렉터 사용
     const forms: HTMLFormElement[] = [];
     
-    // 1. Action 기반 - 가장 안정적
+    // 🎯 새로운 전략: React 컴포넌트 기반 댓글 양식 찾기
+    const reactComponentApproach = () => {
+      // GitHub의 최신 React 댓글 컴포넌트들
+      const commentWrappers = [
+        '[class*="IssueCommentComposer"]',
+        '[class*="CommentComposer"]', 
+        '[class*="CommentBox"]',
+        '[class*="commentComposer"]',
+        '[class*="react-issue-comment-composer"]',
+        '#react-issue-comment-composer'
+      ];
+      
+      commentWrappers.forEach(wrapper => {
+        const elements = document.querySelectorAll(wrapper);
+        elements.forEach(element => {
+          // 컴포넌트 내부의 form 찾기
+          const form = element.querySelector('form') || element.closest('form');
+          if (form && !forms.includes(form)) {
+            const textarea = form.querySelector('textarea');
+            if (textarea) {
+              forms.push(form as HTMLFormElement);
+              if (this.options.debug) {
+                console.log('✅ Found React component form:', {
+                  wrapper: wrapper,
+                  formAction: form.action,
+                  textareaClass: textarea.className
+                });
+              }
+            }
+          }
+        });
+      });
+    };
+
+    // 🎯 prc- 클래스 기반 textarea로 form 찾기
+    const prcBasedApproach = () => {
+      const prcTextareas = document.querySelectorAll('textarea[class*="prc-Textarea"], textarea[class*="prc-TextArea"]');
+      prcTextareas.forEach(textarea => {
+        const form = textarea.closest('form');
+        if (form && !forms.includes(form)) {
+          forms.push(form as HTMLFormElement);
+          if (this.options.debug) {
+            console.log('✅ Found prc-based form:', {
+              textareaClass: textarea.className,
+              textareaId: textarea.id,
+              formAction: form.action
+            });
+          }
+        }
+      });
+    };
+
+    // 🎯 동적 React ID 패턴으로 textarea 찾기
+    const dynamicIdApproach = () => {
+      const dynamicTextareas = document.querySelectorAll('textarea[id*=":r"]');
+      dynamicTextareas.forEach(textarea => {
+        const form = textarea.closest('form');
+        if (form && !forms.includes(form)) {
+          forms.push(form as HTMLFormElement);
+          if (this.options.debug) {
+            console.log('✅ Found dynamic ID form:', {
+              textareaId: textarea.id,
+              textareaClass: textarea.className,
+              formAction: form.action
+            });
+          }
+        }
+      });
+    };
+
+    // 🎯 기존 방식들 (fallback)
     const actionBasedSelectors = [
       'form[action*="/comment"]',
       'form[action*="/comments"]',
       'form[action*="/issues/"][action*="/comments"]',
       'form[action*="/pull/"][action*="/comments"]',
-      'form[action*="/discussions/"][action*="/comments"]',
     ];
     
-    // 2. Data 속성 기반 - GitHub의 컴포넌트 식별자
     const dataBasedSelectors = [
       'form[data-target*="comment"]',
       'form[data-turbo-permanent]',
       'form[data-testid*="comment"]',
-      'form[data-component*="comment"]',
     ];
     
-    // 3. 텍스트 기반 - textarea 내용으로 form 찾기
-    const textareaBasedApproach = () => {
-      const textareas = document.querySelectorAll('textarea');
-      textareas.forEach(textarea => {
-        const form = textarea.closest('form');
-        if (form && this.isCommentTextarea(textarea)) {
-          if (!forms.includes(form)) {
-            forms.push(form);
-          }
-        }
-      });
-    };
+    // 각 전략을 순차적으로 실행
+    reactComponentApproach();
+    prcBasedApproach(); 
+    dynamicIdApproach();
     
-    // 4. 구조적 접근 - button과 textarea 조합으로 댓글 form 찾기
-    const structuralApproach = () => {
-      const allForms = document.querySelectorAll('form');
-      allForms.forEach(form => {
-        const textarea = form.querySelector('textarea');
-        const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
-        
-        if (textarea && submitButton && this.isCommentTextarea(textarea)) {
-          if (!forms.includes(form)) {
-            forms.push(form);
-          }
-        }
-      });
-    };
-    
-         // 각 전략을 순차적으로 적용
-     const allSelectors = [...actionBasedSelectors, ...dataBasedSelectors];
+    const allSelectors = [...actionBasedSelectors, ...dataBasedSelectors];
     
     for (const selector of allSelectors) {
       try {
@@ -146,6 +188,32 @@ export class CommentInterceptor {
     }
     
     // Fallback 전략들 실행
+    const textareaBasedApproach = () => {
+      const textareas = document.querySelectorAll('textarea');
+      textareas.forEach(textarea => {
+        const form = textarea.closest('form');
+        if (form && this.isCommentTextarea(textarea)) {
+          if (!forms.includes(form)) {
+            forms.push(form);
+          }
+        }
+      });
+    };
+    
+    const structuralApproach = () => {
+      const allForms = document.querySelectorAll('form');
+      allForms.forEach(form => {
+        const textarea = form.querySelector('textarea');
+        const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
+        
+        if (textarea && submitButton && this.isCommentTextarea(textarea)) {
+          if (!forms.includes(form)) {
+            forms.push(form);
+          }
+        }
+      });
+    };
+    
     textareaBasedApproach();
     structuralApproach();
 
@@ -165,9 +233,36 @@ export class CommentInterceptor {
   }
 
   /**
-   * Textarea가 댓글 입력 필드인지 판별하는 헬퍼 메서드
+   * Textarea가 댓글 입력 필드인지 판별하는 헬퍼 메서드 (2024 React UI 대응)
    */
   private isCommentTextarea(textarea: HTMLTextAreaElement): boolean {
+    // 🎯 prc-Textarea 클래스 확인 (GitHub 최신 패턴)
+    const className = textarea.className?.toLowerCase();
+    if (className && (
+      className.includes('prc-textarea') ||
+      className.includes('prc-textinput') ||
+      className.includes('commentbox') ||
+      className.includes('comment-box')
+    )) {
+      return true;
+    }
+
+    // 🎯 동적 React ID 패턴 확인
+    const id = textarea.id;
+    if (id && id.includes(':r')) {
+      // React의 동적 ID인 경우, 부모 컨테이너에서 댓글 관련 클래스 확인
+      const parentContainer = textarea.closest('[class*="Comment"], [class*="comment"]');
+      if (parentContainer) {
+        return true;
+      }
+    }
+
+    // 🎯 부모 컨테이너의 React 컴포넌트명 확인
+    const reactCommentContainer = textarea.closest('[class*="IssueCommentComposer"], [class*="CommentComposer"], [class*="CommentBox"]');
+    if (reactCommentContainer) {
+      return true;
+    }
+    
     // name 속성 확인
     const name = textarea.name?.toLowerCase();
     if (name && (name.includes('comment') || name.includes('body'))) {
