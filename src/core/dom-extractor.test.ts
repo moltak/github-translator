@@ -679,4 +679,82 @@ describe('safeReplaceText - Complex HTML Structure Preservation', () => {
     expect(allTexts).not.toContain('opened 2 days ago');
     expect(allTexts).not.toContain('@username');
   });
+
+  describe('URL-based filtering', () => {
+    beforeEach(() => {
+      // 각 테스트 전에 DOM 초기화
+      document.body.innerHTML = '';
+    });
+
+    test('should detect translatable URLs correctly', () => {
+      // given - content script의 isTranslatableURL 함수 시뮬레이션
+      const isTranslatableURL = (url: string): boolean => {
+        const pathname = new URL(url).pathname.toLowerCase();
+        return pathname.includes('/issues') || pathname.includes('/pull');
+      };
+
+      // when & then - Issues URLs
+      expect(isTranslatableURL('https://github.com/owner/repo/issues')).toBe(true);
+      expect(isTranslatableURL('https://github.com/owner/repo/issues/123')).toBe(true);
+      expect(isTranslatableURL('https://github.com/owner/repo/issues?q=bug')).toBe(true);
+      
+      // when & then - Pull Request URLs  
+      expect(isTranslatableURL('https://github.com/owner/repo/pull/456')).toBe(true);
+      expect(isTranslatableURL('https://github.com/owner/repo/pulls')).toBe(true);
+      expect(isTranslatableURL('https://github.com/owner/repo/pulls?q=feature')).toBe(true);
+      
+      // when & then - Non-translatable URLs
+      expect(isTranslatableURL('https://github.com/owner/repo')).toBe(false);
+      expect(isTranslatableURL('https://github.com/owner/repo/commits')).toBe(false);
+      expect(isTranslatableURL('https://github.com/owner/repo/wiki')).toBe(false);
+      expect(isTranslatableURL('https://github.com/owner/repo/settings')).toBe(false);
+      expect(isTranslatableURL('https://github.com/owner/repo/actions')).toBe(false);
+      expect(isTranslatableURL('https://github.com/owner/repo/releases')).toBe(false);
+      expect(isTranslatableURL('https://github.com/explore')).toBe(false);
+      expect(isTranslatableURL('https://github.com/notifications')).toBe(false);
+    });
+
+    test('should only extract titles on translatable pages', () => {
+      // given - Issues 페이지 시뮬레이션
+      mockLocation('/owner/repo/issues/123');
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <a href="/issues/123" class="IssuePullRequestTitle-module__ListItemTitle_1--_xOfg">
+          Bug fix needed
+        </a>
+      `;
+      document.body.appendChild(container);
+
+      // when - Issues 페이지에서 제목 추출
+      const issuesTitles = getIssueTitles();
+
+      // then - 제목이 추출되어야 함
+      expect(issuesTitles.length).toBe(1);
+      expect(issuesTitles[0].text).toBe('Bug fix needed');
+    });
+
+    test('should handle edge cases in URL patterns', () => {
+      // given - 엣지 케이스 URL 테스트
+      const isTranslatableURL = (url: string): boolean => {
+        const pathname = new URL(url).pathname.toLowerCase();
+        return pathname.includes('/issues') || pathname.includes('/pull');
+      };
+
+      // when & then - 대소문자 구분 없이 동작해야 함
+      expect(isTranslatableURL('https://github.com/Owner/Repo/Issues/123')).toBe(true);
+      expect(isTranslatableURL('https://github.com/Owner/Repo/Pull/456')).toBe(true);
+      
+      // when & then - 부분 매칭 테스트
+      expect(isTranslatableURL('https://github.com/owner/repo-issues/commits')).toBe(false); // '/issues'가 없음 (issues만 있음)
+      expect(isTranslatableURL('https://github.com/pull-request/repo/commits')).toBe(true); // '/pull'이 포함됨
+      
+      // when & then - 완전히 다른 경로는 false
+      expect(isTranslatableURL('https://github.com/owner/repo/commits')).toBe(false);
+      expect(isTranslatableURL('https://github.com/owner/repo/settings')).toBe(false);
+      
+      // when & then - 쿼리 파라미터나 프래그먼트가 있는 경우
+      expect(isTranslatableURL('https://github.com/owner/repo/issues/123#comment-456')).toBe(true);
+      expect(isTranslatableURL('https://github.com/owner/repo/issues/123?tab=commits')).toBe(true);
+    });
+  });
 });

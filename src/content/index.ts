@@ -8,6 +8,26 @@ console.log('🚀 Hello GitHub Translator - Content Script Loaded!');
 let isTranslatorEnabled = true;
 let currentTitles: any[] = [];
 
+/**
+ * URL이 번역 대상인지 확인하는 함수
+ */
+const isTranslatableURL = (url: string): boolean => {
+  const pathname = new URL(url).pathname.toLowerCase();
+  
+  // issues나 pull이 포함된 URL만 번역 대상
+  const isIssuesOrPulls = pathname.includes('/issues') || pathname.includes('/pull');
+  
+  console.log('🔍 URL Check:', {
+    url,
+    pathname,
+    isIssuesOrPulls,
+    includes_issues: pathname.includes('/issues'),
+    includes_pull: pathname.includes('/pull')
+  });
+  
+  return isIssuesOrPulls;
+};
+
 // GitHub 페이지에서 실행되는지 확인
 if (window.location.hostname === 'github.com') {
   console.log('✅ Running on GitHub.com');
@@ -16,6 +36,19 @@ if (window.location.hostname === 'github.com') {
   // Sprint 2.1: 제목 추출 및 출력 함수
   const extractAndLogTitles = async () => {
     try {
+      // 🎯 URL 기반 필터링 - issues나 pull 페이지가 아니면 번역 건너뛰기
+      if (!isTranslatableURL(window.location.href)) {
+        console.log('⏭️ Skipping translation - URL does not contain issues or pull');
+        console.log('📋 Translation is only available on:');
+        console.log('   - /issues (issues list)');
+        console.log('   - /issues/123 (specific issue)'); 
+        console.log('   - /pull/123 (specific pull request)');
+        console.log('   - /pulls (pull requests list)');
+        return;
+      }
+      
+      console.log('✅ URL contains issues or pull - proceeding with translation');
+      
       // DOM이 완전히 로드될 때까지 대기
       await waitForDOM();
       
@@ -190,6 +223,12 @@ if (window.location.hostname === 'github.com') {
       }
       
       observerTimeout = setTimeout(async () => {
+        // 🎯 URL 체크 추가 - issues/pull 페이지에서만 재실행
+        if (!isTranslatableURL(window.location.href)) {
+          console.log('⏭️ Skipping re-extraction - URL changed to non-translatable page');
+          return;
+        }
+        
         console.log('🔄 Re-running extraction due to DOM changes...');
         await extractAndLogTitles();
       }, 1000); // DOM 변화 후 1초 대기
@@ -216,6 +255,12 @@ if (window.location.hostname === 'github.com') {
         if (isTranslatorEnabled) {
           // 활성화 시 제목 교체 실행
           setTimeout(async () => {
+            // 🎯 URL 체크 추가 - issues/pull 페이지에서만 실행
+            if (!isTranslatableURL(window.location.href)) {
+              console.log('⏭️ Skipping translation on enable - not on issues/pull page');
+              return;
+            }
+            
             await extractAndLogTitles();
           }, 500);
         } else {
@@ -240,6 +285,13 @@ if (window.location.hostname === 'github.com') {
     // Ctrl + Shift + P로 PR 설명 감지 테스트
     if (event.ctrlKey && event.shiftKey && event.key === 'P') {
       event.preventDefault();
+      
+      // 🎯 URL 체크 추가 - issues/pull 페이지에서만 테스트 가능
+      if (!isTranslatableURL(window.location.href)) {
+        console.log('⏭️ PR description test disabled - not on issues/pull page');
+        return;
+      }
+      
       testPRDescriptionDetection();
       return;
     }
@@ -247,6 +299,17 @@ if (window.location.hostname === 'github.com') {
     // Ctrl + Shift + T로 제목 토글
     if (event.ctrlKey && event.shiftKey && event.key === 'T') {
       event.preventDefault();
+      
+      // 🎯 URL 체크 추가 - issues/pull 페이지에서만 토글 가능
+      if (!isTranslatableURL(window.location.href)) {
+        console.log('⏭️ Keyboard shortcut disabled - not on issues/pull page');
+        console.log('📋 Translation shortcuts only work on:');
+        console.log('   - /issues (issues list)');
+        console.log('   - /issues/123 (specific issue)'); 
+        console.log('   - /pull/123 (specific pull request)');
+        console.log('   - /pulls (pull requests list)');
+        return;
+      }
       
       if (currentTitles.length > 0) {
         const hasReplacedTitles = document.querySelector('[data-github-translator="replaced"]');
