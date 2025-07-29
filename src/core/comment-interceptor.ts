@@ -147,85 +147,78 @@ export class CommentInterceptor {
        console.log(`🔍 Found ${allButtons.length} total buttons/clickable elements`);
      }
      
-     allButtons.forEach((button, index) => {
-       const element = button as HTMLElement;
-       const text = element.textContent?.toLowerCase() || '';
-       const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || '';
-       const className = element.className?.toLowerCase() || '';
-       const type = element.getAttribute('type')?.toLowerCase() || '';
+           allButtons.forEach((button, index) => {
+        const element = button as HTMLElement;
+        const text = element.textContent?.toLowerCase() || '';
+        const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || '';
+        const className = element.className?.toLowerCase() || '';
+        const type = element.getAttribute('type')?.toLowerCase() || '';
        
-       if (this.options.debug) {
-         console.log(`🔍 Button ${index + 1}:`, {
-           text: text.substring(0, 30),
-           ariaLabel: ariaLabel,
-           className: className.substring(0, 50),
-           type: type,
-           visible: element.offsetWidth > 0 && element.offsetHeight > 0,
-           disabled: element.disabled
-         });
-       }
+               // 더 포괄적인 댓글 제출 버튼 감지 (GitHub 2024 UI 대응)
+        const isCommentButton = (
+          // 텍스트 기반 감지 (더 관대하게)
+          text.includes('comment') || 
+          text.includes('submit') ||
+          text.includes('reply') ||
+          text.includes('post') ||
+          text.includes('send') ||
+          text.includes('add') ||
+          text.length === 0 || // 아이콘 전용 버튼
+          
+          // Aria label 기반 감지
+          ariaLabel.includes('comment') ||
+          ariaLabel.includes('submit') ||
+          ariaLabel.includes('reply') ||
+          ariaLabel.includes('post') ||
+          ariaLabel.includes('send') ||
+          
+          // CSS 클래스 기반 감지 (더 관대하게)
+          className.includes('submit') ||
+          className.includes('comment') ||
+          className.includes('primary') ||
+          className.includes('btn-primary') ||
+          className.includes('button-primary') ||
+          
+          // Type 기반 감지
+          type === 'submit' ||
+          
+          // GitHub의 prc- 클래스 기반 감지
+          className.includes('prc-button') ||
+          className.includes('prc-btn')
+        );
        
-       // 더 포괄적인 댓글 제출 버튼 감지
-       const isCommentButton = (
-         // 텍스트 기반 감지
-         text.includes('comment') || 
-         text.includes('submit') ||
-         text.includes('reply') ||
-         text.includes('post') ||
-         text.includes('send') ||
-         text.includes('add') ||
-         
-         // Aria label 기반 감지
-         ariaLabel.includes('comment') ||
-         ariaLabel.includes('submit') ||
-         ariaLabel.includes('reply') ||
-         ariaLabel.includes('post') ||
-         ariaLabel.includes('send') ||
-         
-         // CSS 클래스 기반 감지
-         className.includes('submit') ||
-         className.includes('comment') ||
-         className.includes('primary') ||
-         
-         // Type 기반 감지
-         type === 'submit'
-       );
-       
-       // 버튼이 보이고 활성화되어 있으면 추가
-       if (isCommentButton && element.offsetWidth > 0 && element.offsetHeight > 0 && !element.disabled) {
-         buttons.push(element);
-         
-         if (this.options.debug) {
-           console.log(`✅ Selected as comment button ${buttons.length}:`, {
-             text: text.substring(0, 30),
-             reason: isCommentButton ? 'matched criteria' : 'fallback'
-           });
-         }
-       }
+               // 버튼이 보이고 활성화되어 있으면 추가
+        if (isCommentButton && element.offsetWidth > 0 && element.offsetHeight > 0 && !element.disabled) {
+          buttons.push(element);
+          
+          if (this.options.debug) {
+            console.log(`✅ Selected comment button ${buttons.length}: "${text.substring(0, 20)}"`);
+          }
+        }
      });
      
-     // 명시적인 submit 버튼이 없으면 더 관대한 fallback
-     if (buttons.length === 0) {
-       if (this.options.debug) {
-         console.log('🔍 No specific comment buttons found, using fallback approach...');
-       }
-       
-       const fallbackButtons = container.querySelectorAll('button:not([disabled])');
-       fallbackButtons.forEach((btn, index) => {
-         const element = btn as HTMLElement;
-         // 보이는 버튼만 추가
-         if (element.offsetWidth > 0 && element.offsetHeight > 0) {
-           buttons.push(element);
-           
-           if (this.options.debug) {
-             console.log(`✅ Fallback button ${index + 1}:`, {
-               text: element.textContent?.trim().substring(0, 30),
-               className: element.className.substring(0, 50)
-             });
-           }
-         }
-       });
-     }
+           // 명시적인 submit 버튼이 없으면 더 관대한 fallback
+      if (buttons.length === 0) {
+        if (this.options.debug) {
+          console.log('🔍 No specific comment buttons found, using fallback approach...');
+        }
+        
+        // 모든 보이는 버튼을 후보로 추가 (최대 3개까지)
+        const fallbackButtons = container.querySelectorAll('button:not([disabled])');
+        let fallbackCount = 0;
+        
+        fallbackButtons.forEach((btn) => {
+          const element = btn as HTMLElement;
+          if (element.offsetWidth > 0 && element.offsetHeight > 0 && fallbackCount < 3) {
+            buttons.push(element);
+            fallbackCount++;
+            
+            if (this.options.debug) {
+              console.log(`✅ Fallback button ${fallbackCount}: "${element.textContent?.trim().substring(0, 20)}"`);
+            }
+          }
+        });
+      }
      
      if (this.options.debug) {
        console.log(`🎯 Final result: ${buttons.length} comment buttons selected`);
@@ -786,32 +779,32 @@ export class CommentInterceptor {
         // React 컴포넌트용 버튼 클릭 핸들러 생성
         const handler = this.createReactButtonHandler(textarea, buttons);
         
-                 // 모든 관련 버튼에 클릭 리스너 추가
-         buttons.forEach((button, index) => {
-           button.addEventListener('click', handler, true); // capture phase에서 실행
-           
-           // 추가 디버깅: 모든 클릭 감지
-           button.addEventListener('click', (e) => {
-             if (this.options.debug) {
-               console.log(`🔔 DEBUG: Button ${index + 1} clicked (any click):`, {
-                 buttonText: button.textContent?.trim(),
-                 buttonClass: button.className,
-                 textareaValue: textarea.value.substring(0, 50) + '...',
-                 hasKorean: this.containsKorean(textarea.value)
-               });
-             }
-           }, false); // bubble phase에서도 확인
-           
-           if (this.options.debug) {
-             console.log(`🔔 Added click listener to button ${index + 1}:`, {
-               buttonText: button.textContent?.trim(),
-               buttonClass: button.className,
-               buttonType: button.getAttribute('type'),
-               buttonRole: button.getAttribute('role'),
-               buttonAriaLabel: button.getAttribute('aria-label')
-             });
-           }
-         });
+                          // 모든 관련 버튼에 클릭 리스너 추가
+          buttons.forEach((button, index) => {
+            // 강력한 이벤트 리스너 등록 (multiple strategies)
+            button.addEventListener('click', handler, true); // capture phase
+            button.addEventListener('click', handler, false); // bubble phase
+            button.addEventListener('mousedown', handler, true); // mousedown도 시도
+            
+            // 추가 디버깅: 모든 클릭 감지
+            const debugHandler = (e: Event) => {
+              if (this.options.debug) {
+                console.log(`🔔 DEBUG: Button ${index + 1} clicked (${e.type}):`, {
+                  buttonText: button.textContent?.trim(),
+                  textareaValue: textarea.value.substring(0, 50) + '...',
+                  hasKorean: this.containsKorean(textarea.value),
+                  eventType: e.type
+                });
+              }
+            };
+            
+            button.addEventListener('click', debugHandler, false);
+            button.addEventListener('mousedown', debugHandler, false);
+            
+            if (this.options.debug) {
+              console.log(`🔔 Added listeners to button ${index + 1}: "${button.textContent?.trim().substring(0, 20)}"`);
+            }
+          });
         
         this.interceptedTextareas.add(textarea);
         interceptedCount++;
