@@ -56,103 +56,146 @@ export class CommentInterceptor {
   }
 
     /**
-   * GitHub 댓글 form을 찾는 함수 (2024 React UI 대응)
+   * GitHub 댓글 컴포넌트를 찾는 함수 (Form 없는 2024 React UI 대응)
    */
-  private findCommentForms(): HTMLFormElement[] {
-    const forms: HTMLFormElement[] = [];
+  private findCommentComponents(): Array<{textarea: HTMLTextAreaElement, container: Element, buttons: HTMLElement[]}> {
+    const components: Array<{textarea: HTMLTextAreaElement, container: Element, buttons: HTMLElement[]}> = [];
     
-    // 🎯 새로운 전략: React 컴포넌트 기반 댓글 양식 찾기
-    const reactComponentApproach = () => {
-      // GitHub의 최신 React 댓글 컴포넌트들
-      const commentWrappers = [
-        '[class*="IssueCommentComposer"]',
-        '[class*="CommentComposer"]', 
-        '[class*="CommentBox"]',
-        '[class*="commentComposer"]',
-        '[class*="react-issue-comment-composer"]',
-        '#react-issue-comment-composer'
-      ];
-      
-      commentWrappers.forEach(wrapper => {
-        const elements = document.querySelectorAll(wrapper);
-        elements.forEach(element => {
-          // 컴포넌트 내부의 form 찾기
-          const form = element.querySelector('form') || element.closest('form');
-          if (form && !forms.includes(form)) {
-            const textarea = form.querySelector('textarea');
-            if (textarea) {
-              forms.push(form as HTMLFormElement);
+    if (this.options.debug) {
+      console.log('🔍 CommentInterceptor: Searching for React comment components (form-less)...');
+    }
+    
+    // 🎯 prc-Textarea 기반으로 댓글 컴포넌트 찾기
+    const prcTextareas = document.querySelectorAll('textarea[class*="prc-Textarea"], textarea[class*="prc-TextArea"]');
+    
+    prcTextareas.forEach(textarea => {
+      if (this.isCommentTextarea(textarea as HTMLTextAreaElement)) {
+        // React 컨테이너 찾기
+        const container = textarea.closest('[class*="IssueCommentComposer"], [class*="CommentComposer"], [class*="CommentBox"]') 
+                       || textarea.closest('[id*="comment"]') 
+                       || textarea.parentElement?.closest('div');
+        
+        if (container) {
+          // 컨테이너 내부의 submit/comment 버튼들 찾기
+          const buttons = this.findCommentButtons(container);
+          
+          if (buttons.length > 0) {
+            components.push({
+              textarea: textarea as HTMLTextAreaElement,
+              container: container,
+              buttons: buttons
+            });
+            
+            if (this.options.debug) {
+              console.log('✅ Found React comment component:', {
+                textareaId: textarea.id,
+                textareaClass: textarea.className,
+                containerClass: container.className,
+                buttonsCount: buttons.length
+              });
+            }
+          }
+        }
+      }
+    });
+    
+    // 🎯 React ID 패턴으로 추가 검색
+    const dynamicTextareas = document.querySelectorAll('textarea[id*=":r"]');
+    dynamicTextareas.forEach(textarea => {
+      if (this.isCommentTextarea(textarea as HTMLTextAreaElement)) {
+        const existing = components.find(comp => comp.textarea === textarea);
+        if (!existing) {
+          const container = textarea.closest('[class*="Comment"]') || textarea.parentElement?.closest('div');
+          if (container) {
+            const buttons = this.findCommentButtons(container);
+            if (buttons.length > 0) {
+              components.push({
+                textarea: textarea as HTMLTextAreaElement,
+                container: container,
+                buttons: buttons
+              });
+              
               if (this.options.debug) {
-                console.log('✅ Found React component form:', {
-                  wrapper: wrapper,
-                  formAction: form.action,
-                  textareaClass: textarea.className
+                console.log('✅ Found dynamic ID comment component:', {
+                  textareaId: textarea.id,
+                  buttonsCount: buttons.length
                 });
               }
             }
           }
-        });
-      });
-    };
+        }
+      }
+    });
+    
+    return components;
+  }
 
-    // 🎯 prc- 클래스 기반 textarea로 form 찾기
-    const prcBasedApproach = () => {
-      const prcTextareas = document.querySelectorAll('textarea[class*="prc-Textarea"], textarea[class*="prc-TextArea"]');
-      prcTextareas.forEach(textarea => {
-        const form = textarea.closest('form');
-        if (form && !forms.includes(form)) {
-          forms.push(form as HTMLFormElement);
-          if (this.options.debug) {
-            console.log('✅ Found prc-based form:', {
-              textareaClass: textarea.className,
-              textareaId: textarea.id,
-              formAction: form.action
-            });
-          }
+  /**
+   * 컨테이너 내부의 댓글 제출 버튼들을 찾는 함수
+   */
+  private findCommentButtons(container: Element): HTMLElement[] {
+    const buttons: HTMLElement[] = [];
+    
+    // 모든 버튼과 클릭 가능한 요소들 검색
+    const allButtons = container.querySelectorAll('button, [role="button"], [type="submit"]');
+    
+    allButtons.forEach(button => {
+      const text = button.textContent?.toLowerCase() || '';
+      const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+      const className = button.className?.toLowerCase() || '';
+      
+      // 댓글 제출 버튼인지 판별
+      if (
+        text.includes('comment') || 
+        text.includes('submit') ||
+        text.includes('reply') ||
+        text.includes('post') ||
+        ariaLabel.includes('comment') ||
+        ariaLabel.includes('submit') ||
+        className.includes('submit') ||
+        className.includes('comment')
+      ) {
+        buttons.push(button as HTMLElement);
+      }
+    });
+    
+    // 명시적인 submit 버튼이 없으면 모든 버튼 중에서 찾기
+    if (buttons.length === 0) {
+      const fallbackButtons = container.querySelectorAll('button[type="submit"], button:not([type])');
+      fallbackButtons.forEach(btn => {
+        // 숨겨진 버튼이나 disabled 버튼은 제외
+        const element = btn as HTMLElement;
+        if (element.offsetWidth > 0 && element.offsetHeight > 0 && !element.disabled) {
+          buttons.push(element);
         }
       });
-    };
+    }
+    
+    return buttons;
+  }
 
-    // 🎯 동적 React ID 패턴으로 textarea 찾기
-    const dynamicIdApproach = () => {
-      const dynamicTextareas = document.querySelectorAll('textarea[id*=":r"]');
-      dynamicTextareas.forEach(textarea => {
-        const form = textarea.closest('form');
-        if (form && !forms.includes(form)) {
-          forms.push(form as HTMLFormElement);
-          if (this.options.debug) {
-            console.log('✅ Found dynamic ID form:', {
-              textareaId: textarea.id,
-              textareaClass: textarea.className,
-              formAction: form.action
-            });
-          }
-        }
-      });
-    };
-
-    // 🎯 기존 방식들 (fallback)
-    const actionBasedSelectors = [
-      'form[action*="/comment"]',
-      'form[action*="/comments"]',
-      'form[action*="/issues/"][action*="/comments"]',
-      'form[action*="/pull/"][action*="/comments"]',
-    ];
-    
-    const dataBasedSelectors = [
-      'form[data-target*="comment"]',
-      'form[data-turbo-permanent]',
-      'form[data-testid*="comment"]',
-    ];
-    
-    // 각 전략을 순차적으로 실행
-    reactComponentApproach();
-    prcBasedApproach(); 
-    dynamicIdApproach();
-    
-    const allSelectors = [...actionBasedSelectors, ...dataBasedSelectors];
-    
-    for (const selector of allSelectors) {
+     /**
+    * 기존 form 기반 방식 (fallback)
+    */
+   private findCommentForms(): HTMLFormElement[] {
+     const forms: HTMLFormElement[] = [];
+     
+     const actionBasedSelectors = [
+       'form[action*="/comment"]',
+       'form[action*="/comments"]',
+       'form[action*="/issues/"][action*="/comments"]',
+       'form[action*="/pull/"][action*="/comments"]',
+     ];
+     
+     const dataBasedSelectors = [
+       'form[data-target*="comment"]',
+       'form[data-turbo-permanent]',
+       'form[data-testid*="comment"]',
+     ];
+     
+     const allSelectors = [...actionBasedSelectors, ...dataBasedSelectors];
+     
+     for (const selector of allSelectors) {
       try {
         // has() 셀렉터나 복잡한 셀렉터 대신 더 단순한 방식으로 처리
         if (selector.includes('textarea[')) {
@@ -380,7 +423,132 @@ export class CommentInterceptor {
   }
 
   /**
-   * Form submit 이벤트를 intercept하는 핸들러
+   * React 버튼 클릭을 intercept하는 핸들러 (Form 없는 GitHub 2024 UI)
+   */
+  private createReactButtonHandler(textarea: HTMLTextAreaElement, buttons: HTMLElement[]) {
+    return async (event: Event) => {
+      if (this.options.debug) {
+        console.log('🔔 CommentInterceptor: React button clicked', {
+          eventType: event.type,
+          buttonText: (event.target as HTMLElement)?.textContent?.trim(),
+          textareaValue: textarea.value?.substring(0, 50) + '...'
+        });
+      }
+
+      // URL 필터링 체크
+      if (!this.isTranslatableURL(window.location.href)) {
+        if (this.options.debug) {
+          console.log('⏭️ CommentInterceptor: Skipping - URL not translatable');
+        }
+        return; // 번역하지 않고 그대로 진행
+      }
+
+      if (!this.options.enabled) {
+        if (this.options.debug) {
+          console.log('⏭️ CommentInterceptor: Skipping - disabled');
+        }
+        return; // 번역하지 않고 그대로 진행
+      }
+
+      const text = textarea.value.trim();
+      
+      // 텍스트가 비어있으면 번역하지 않음
+      if (!text) {
+        if (this.options.debug) {
+          console.log('⏭️ CommentInterceptor: Skipping - empty text');
+        }
+        return;
+      }
+
+      // 한국어가 포함되어 있지 않으면 번역하지 않음
+      if (!this.containsKorean(text)) {
+        if (this.options.debug) {
+          console.log('⏭️ CommentInterceptor: Skipping - no Korean text detected');
+          console.log('   Text preview:', text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+        }
+        return;
+      }
+
+      // 버튼 클릭을 중단하고 번역 수행
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (this.options.debug) {
+        console.log('🛑 CommentInterceptor: Button click intercepted for translation');
+        console.log('   Korean text detected:', text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+      }
+
+      try {
+        // 버튼 비활성화 (중복 제출 방지)
+        const clickedButton = event.target as HTMLElement;
+        buttons.forEach(button => {
+          (button as any).disabled = true;
+        });
+
+        // 번역 진행 표시
+        const originalValue = textarea.value;
+        textarea.value = '🔄 번역 중... (Translating...)';
+        textarea.disabled = true;
+
+        // 한국어 → 영어 번역 실행
+        const translatedText = await this.translateText(text, TranslationDirection.KO_TO_EN);
+
+        // 번역된 텍스트로 교체
+        textarea.value = translatedText;
+        textarea.disabled = false;
+
+        // 버튼 재활성화
+        buttons.forEach(button => {
+          (button as any).disabled = false;
+        });
+
+        if (this.options.debug) {
+          console.log('✅ CommentInterceptor: Translation completed, triggering original click');
+          console.log('   Translated text:', translatedText.substring(0, 100) + (translatedText.length > 100 ? '...' : ''));
+        }
+
+        // 번역된 텍스트로 원래 버튼 클릭 시뮬레이션
+        // 이번에는 Korean detection을 우회하기 위해 interceptor를 일시적으로 비활성화
+        this.setEnabled(false);
+        
+        if (this.options.debug) {
+          console.log('🚀 CommentInterceptor: Simulating original button click');
+        }
+        
+        // 원래 클릭된 버튼을 다시 클릭
+        setTimeout(() => {
+          clickedButton.click();
+          
+          // 제출 후 잠깐 대기하고 원상태로 복구 (SPA 환경 고려)
+          setTimeout(() => {
+            this.setEnabled(true);
+            textarea.value = originalValue; // 원본 한국어 텍스트로 복원 (사용자 편의)
+            if (this.options.debug) {
+              console.log('🔄 CommentInterceptor: Restored original Korean text for user convenience');
+            }
+          }, 1000);
+        }, 100);
+
+      } catch (error) {
+        // 번역 실패 시 원본 텍스트 복원
+        textarea.value = text;
+        textarea.disabled = false;
+
+        // 버튼 재활성화
+        buttons.forEach(button => {
+          (button as any).disabled = false;
+        });
+
+        console.error('❌ CommentInterceptor: Translation failed:', error);
+        
+        // 사용자에게 오류 알림
+        alert(`번역 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}\n\n원본 텍스트로 다시 시도하시거나, 영어로 직접 작성해주세요.`);
+      }
+    };
+  }
+
+  /**
+   * Form submit 이벤트를 intercept하는 핸들러 (레거시 지원)
    * GitHub의 AJAX/Fetch 기반 submit과 일반 form submit 모두 처리
    */
   private createSubmitHandler(form: HTMLFormElement, textarea: HTMLTextAreaElement) {
@@ -522,7 +690,7 @@ export class CommentInterceptor {
   }
 
   /**
-   * CommentInterceptor 활성화
+   * CommentInterceptor 활성화 (React 컴포넌트 방식)
    */
   public start(): void {
     if (this.isActive) {
@@ -541,51 +709,60 @@ export class CommentInterceptor {
     }
 
     if (this.options.debug) {
-      console.log('🚀 CommentInterceptor starting...');
+      console.log('🚀 CommentInterceptor starting (React mode)...');
     }
 
-    const forms = this.findCommentForms();
+    // 🎯 새로운 방식: React 컴포넌트 기반 처리
+    const components = this.findCommentComponents();
     let interceptedCount = 0;
 
-    forms.forEach(form => {
-      const textarea = this.findCommentTextarea(form);
-      if (textarea && !this.interceptedTextareas.has(textarea)) {
-        const handler = this.createSubmitHandler(form, textarea);
+    components.forEach(component => {
+      const { textarea, container, buttons } = component;
+      
+      if (!this.interceptedTextareas.has(textarea)) {
+        // React 컴포넌트용 버튼 클릭 핸들러 생성
+        const handler = this.createReactButtonHandler(textarea, buttons);
         
-        // 기존 핸들러 백업
-        const existingHandlers = this.originalFormSubmitHandlers.get(form) || [];
-        this.originalFormSubmitHandlers.set(form, existingHandlers);
-        
-        // 새 핸들러 등록 - 여러 이벤트에 대응
-        form.addEventListener('submit', handler, true); // capture phase에서 실행
-        
-        // GitHub의 최신 UI에서는 버튼 클릭으로 AJAX 요청을 보낼 수 있음
-        const submitButtons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
-        submitButtons.forEach(button => {
-          button.addEventListener('click', (clickEvent) => {
-            if (this.options.debug) {
-              console.log('🔔 CommentInterceptor: Submit button clicked', {
-                buttonText: button.textContent?.trim(),
-                buttonType: button.getAttribute('type')
-              });
-            }
-            // 클릭 이벤트에서도 동일한 로직 적용
-            // setTimeout을 사용하여 form submit 이벤트가 발생하기 전에 처리
-            setTimeout(() => {
-              const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-              handler(submitEvent);
-            }, 10);
-          }, true);
+        // 모든 관련 버튼에 클릭 리스너 추가
+        buttons.forEach((button, index) => {
+          button.addEventListener('click', handler, true); // capture phase에서 실행
+          
+          if (this.options.debug) {
+            console.log(`🔔 Added click listener to button ${index + 1}:`, {
+              buttonText: button.textContent?.trim(),
+              buttonClass: button.className
+            });
+          }
         });
         
         this.interceptedTextareas.add(textarea);
         interceptedCount++;
 
         if (this.options.debug) {
-          console.log(`📝 Intercepted comment form ${interceptedCount}:`, {
+          console.log(`📝 Intercepted React comment component ${interceptedCount}:`, {
+            textareaId: textarea.id,
+            textareaClass: textarea.className,
+            containerClass: container.className,
+            buttonsCount: buttons.length
+          });
+        }
+      }
+    });
+
+    // 🎯 Fallback: 기존 form 방식도 시도
+    const forms = this.findCommentForms();
+    forms.forEach(form => {
+      const textarea = this.findCommentTextarea(form);
+      if (textarea && !this.interceptedTextareas.has(textarea)) {
+        const handler = this.createSubmitHandler(form, textarea);
+        form.addEventListener('submit', handler, true);
+        this.interceptedTextareas.add(textarea);
+        interceptedCount++;
+        
+        if (this.options.debug) {
+          console.log(`📝 Intercepted legacy form ${interceptedCount}:`, {
             formAction: form.action,
-            textareaName: textarea.name,
-            textareaPlaceholder: textarea.placeholder
+            textareaName: textarea.name
           });
         }
       }
@@ -597,7 +774,7 @@ export class CommentInterceptor {
     this.startMutationObserver();
 
     if (this.options.debug) {
-      console.log(`✅ CommentInterceptor active - monitoring ${interceptedCount} comment forms`);
+      console.log(`✅ CommentInterceptor active - monitoring ${interceptedCount} comment components`);
     }
   }
 
@@ -720,48 +897,59 @@ export class CommentInterceptor {
   }
 
   /**
-   * 새로운 댓글 양식을 재검사하여 interceptor 설정
+   * 새로운 댓글 양식을 재검사하여 interceptor 설정 (React + Form 방식)
    */
   private recheckCommentForms(): void {
     if (!this.isActive || !this.options.enabled) {
       return;
     }
 
-    const forms = this.findCommentForms();
-    let newFormsCount = 0;
+    let newComponentsCount = 0;
 
+    // 🎯 React 컴포넌트 방식 재검사
+    const components = this.findCommentComponents();
+    components.forEach(component => {
+      const { textarea, container, buttons } = component;
+      
+      if (!this.interceptedTextareas.has(textarea)) {
+        const handler = this.createReactButtonHandler(textarea, buttons);
+        
+        buttons.forEach(button => {
+          button.addEventListener('click', handler, true);
+        });
+        
+        this.interceptedTextareas.add(textarea);
+        newComponentsCount++;
+        
+        if (this.options.debug) {
+          console.log(`✅ Added dynamic React component ${newComponentsCount}:`, {
+            textareaId: textarea.id,
+            buttonsCount: buttons.length
+          });
+        }
+      }
+    });
+
+    // 🎯 레거시 Form 방식 재검사
+    const forms = this.findCommentForms();
     forms.forEach(form => {
       const textarea = this.findCommentTextarea(form);
       if (textarea && !this.interceptedTextareas.has(textarea)) {
         const handler = this.createSubmitHandler(form, textarea);
-        
-        // 새 핸들러 등록
         form.addEventListener('submit', handler, true);
-        
-        // GitHub의 최신 UI에서는 버튼 클릭으로 AJAX 요청을 보낼 수 있음
-        const submitButtons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
-        submitButtons.forEach(button => {
-          button.addEventListener('click', (clickEvent) => {
-            if (this.options.debug) {
-              console.log('🔔 CommentInterceptor: Submit button clicked (dynamic)', {
-                buttonText: button.textContent?.trim(),
-                buttonType: button.getAttribute('type')
-              });
-            }
-            setTimeout(() => {
-              const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-              handler(submitEvent);
-            }, 10);
-          }, true);
-        });
-        
         this.interceptedTextareas.add(textarea);
-        newFormsCount++;
+        newComponentsCount++;
+        
+        if (this.options.debug) {
+          console.log(`✅ Added dynamic legacy form ${newComponentsCount}:`, {
+            formAction: form.action
+          });
+        }
       }
     });
 
-    if (newFormsCount > 0 && this.options.debug) {
-      console.log(`✅ CommentInterceptor: Added ${newFormsCount} new dynamic comment form(s)`);
+    if (newComponentsCount > 0 && this.options.debug) {
+      console.log(`✅ CommentInterceptor: Added ${newComponentsCount} new dynamic comment component(s)`);
     }
   }
 
@@ -772,8 +960,8 @@ export class CommentInterceptor {
     return {
       enabled: this.options.enabled,
       active: this.isActive,
-      interceptedForms: this.originalFormSubmitHandlers.size,
-      interceptedTextareas: this.interceptedTextareas.size,
+      interceptedForms: this.originalFormSubmitHandlers.size, // 레거시 form 개수
+      interceptedTextareas: this.interceptedTextareas.size, // React 컴포넌트 + form 총 개수
       currentUrl: window.location.href,
       isTranslatableUrl: this.isTranslatableURL(window.location.href),
       mutationObserverActive: !!this.mutationObserver
