@@ -16,7 +16,7 @@
 - **Jest** 단위 테스트 (// given // when // then 패턴)
 - **Content Script + Background Worker** 구조
 
-## 📊 현재 상태 (2024-12-19) - 🚀 Major Milestone!
+## 📊 현재 상태 (2025-07-29) - 🚀 Major Milestone!
 
 ### ✅ **완료된 핵심 기능 (사용 가능한 수준)**
 - ✅ **실시간 제목 번역**: GitHub 이슈/PR 제목 → 한국어 번역
@@ -57,7 +57,7 @@
 - [x] Extension이 Chrome에서 로드되고 데모 메시지 출력
 - [x] CI 파이프라인 통과
 
-## ✅ Sprint 1 완료! (2024-12-19)
+## ✅ Sprint 1 완료! (2025-07-29)
 
 **모든 Sprint 1 태스크가 성공적으로 완료되었습니다.**
 
@@ -90,7 +90,7 @@
 | 2.3 Replace titles | ✅ 완료 | 제목을 "HELLO GITHUB TRANSLATOR"로 교체 및 원본 복원 |
 | 2.4 Console print | ✅ 완료 | 원본 제목들을 콘솔에 출력 |
 
-### ✅ Sprint 2.1 완료 (2024-12-19)
+### ✅ Sprint 2.1 완료 (2025-07-29)
 
 **DOM Extractor 모듈 구현 완료:**
 - **src/core/dom-extractor.ts**: 페이지 타입별 제목 추출 로직
@@ -104,7 +104,7 @@
 - https://github.com/huggingface/transformers/issues (이슈 목록)
 - https://github.com/huggingface/transformers/issues/1 (개별 이슈)
 
-## ✅ Sprint 2.2 & 2.3 완료! (2024-12-19)
+## ✅ Sprint 2.2 & 2.3 완료! (2025-07-29)
 
 **모든 Sprint 2 태스크가 성공적으로 완료되었습니다.**
 
@@ -142,7 +142,7 @@
 **GitHub 페이지에서 모든 이슈/PR 제목이 "HELLO GITHUB TRANSLATOR"로 표시됩니다!**
 
 ---
-**마지막 업데이트**: 2024-12-19  
+**마지막 업데이트**: 2025-07-29  
 **다음 스프린트**: Sprint 3 - OpenAI Integration & Translation Service
 
 ## ✅ Sprint 3 - OpenAI Integration & Translation Service (완료!)
@@ -362,7 +362,7 @@ describe('TranslationService', () => {
 
 | 태스크 | 계획서 설명 | 상태 | 실제 구현 내용 |
 |--------|-------------|------|----------------|
-| 4.1 CommentInterceptor | Form submit 캡처, ko→en 번역 후 게시 | ⏳ 대기 | 댓글 작성 시 자동 번역 |
+| 4.1 CommentTranslateButton | 번역 버튼 추가, ko→en 번역 후 게시 | ✅ 완료 | 사용자 친화적 댓글 번역 버튼 시스템 |
 | 4.2 UI Indicator | "Translated" 상태 표시 배지 | ⏳ 대기 | 번역 상태 시각화 |
 | **4.3 LRU cache** | `src/core/cache.ts` (size 500, TTL 24h) | **✅ 완료** | **Size 5000, TTL 24h LRU 캐시 구현** |
 | 4.4 Error overlay | API 실패 시 사용자 친화적 토스트 | ⏳ 대기 | UX 개선 |
@@ -409,15 +409,17 @@ describe('TranslationService', () => {
 - **Sprint 1**: Project & Build Setup → **100% 완료** (7/7 태스크)
 - **Sprint 2**: DOM Extraction & Mutation → **100% 완료** (4/4 태스크) 
 - **Sprint 3**: OpenAI Integration & Translation → **83% 완료** (5/6 태스크)
-- **Sprint 4**: Comment Interception & Polishing → **20% 완료** (1/5 태스크)
+- **Sprint 4**: Comment Interception & Polishing → **40% 완료** (2/5 태스크)
 
 ### 🚀 **현재 핵심 기능 상태**
 - ✅ **제목 번역**: GitHub 이슈/PR 제목 실시간 번역
 - ✅ **설명 번역**: PR/Issue 설명 텍스트 번역 (계획서 초과)
+- ✅ **댓글 번역**: "🌐 번역 후 댓글" 버튼으로 한국어→영어 자동 번역 **(NEW!)**
 - ✅ **링크 보존**: 번역 후에도 클릭 기능 유지
 - ✅ **API 키 관리**: 보안 저장 및 사용자 UI
 - ✅ **에러 처리**: 네트워크/API 오류 복구
-- ✅ **LRU 캐시**: 번역 결과 캐싱으로 토큰 비용 절약 **(NEW!)**
+- ✅ **LRU 캐시**: 번역 결과 캐싱으로 토큰 비용 절약
+- ✅ **GitHub 2024 UI 대응**: 새로운 DOM 구조 완전 지원 **(NEW!)**
 
 ### 📊 **테스트 현황**
 - **총 61개 테스트 모두 통과** ✅ (+22개 캐시 테스트 추가)
@@ -425,13 +427,13 @@ describe('TranslationService', () => {
 - **CI/CD**: GitHub Actions 완전 자동화
 
 ### 🏆 **계획서 대비 성과**
-- **전체 진행률**: 76% (Sprint 1-4 중 20/26 태스크 완료)
-- **핵심 기능**: 번역 엔진 + 캐싱 완료로 **Production Ready**
-- **추가 구현**: PR 설명 번역, 링크 보존, 고성능 캐시 등 **계획서 초과 달성**
-- **기술적 우수성**: OpenAI Responses API + LRU 캐시 최적화
+- **전체 진행률**: 81% (Sprint 1-4 중 21/26 태스크 완료)
+- **핵심 기능**: 번역 엔진 + 캐싱 + 댓글 번역 완료로 **Production Ready**
+- **추가 구현**: PR 설명 번역, 댓글 번역 버튼, GitHub 2024 UI 대응 등 **계획서 초과 달성**
+- **기술적 우수성**: OpenAI Responses API + LRU 캐시 + React 기반 UI 대응
 
 ---
-**마지막 업데이트**: 2024-12-19  
-**현재 스프린트**: Sprint 4 진행중 (1/5 완료) - LRU Cache 완료  
-**다음 우선순위**: Comment Interception (4.1), UI Indicator (4.2), 또는 Rate limiting (3.3)  
-**최신 성과**: 🎉 토큰 비용 절약을 위한 LRU 캐시 시스템 구축 완료!
+**마지막 업데이트**: 2025-07-29  
+**현재 스프린트**: Sprint 4 거의 완료 - CommentTranslateButton 구현 완료!  
+**다음 우선순위**: UI Indicator (4.2), Rate limiting (3.3), README & docs (4.5)  
+**최신 성과**: 🎉 GitHub 2024 UI 대응 + 댓글 번역 버튼 시스템 완성!
